@@ -1,0 +1,54 @@
+[project]
+name = "lgac-backend"
+version = "0.1.0"
+description = "Live Graph Agent Chat — backend"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic-settings",
+    "python-dotenv",
+    "graphiti-core",
+    "neo4j",
+    "langgraph",
+    "langchain-core",
+    "langchain-openai",
+    "langfuse",
+    "pypdf",
+    "python-docx",
+    "python-multipart",
+    "sse-starlette",
+    "sqlalchemy",
+    "pymysql",
+]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "httpx",
+    "ruff",
+    "mypy",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: requires a live Neo4j/MySQL service, skipped without it",
+    "live: requires a live external endpoint, never run in CI",
+]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+disallow_untyped_defs = true
