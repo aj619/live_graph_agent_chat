@@ -43,22 +43,17 @@ A portfolio web app. The user uploads documents (PDF, TXT, DOCX). Each document 
 | D20 | Test environment | Tests never touch dev data. Test runs use a separate stack (own compose project, ports, volumes, databases, and Langfuse project) configured by `.env.test`. A guard refuses integration runs against dev settings (section 5.9) |
 | D21 | Headless agents | Sub-agents run non-interactively. Each task is self-contained: the driver's brief carries the task row, the plan excerpts, the file, and the done check, so no agent needs chat history. All five worker agents are pinned to Haiku 5.5 in their definitions. The driver runs on Sonnet 5.5. Tasks are written so they do not depend on the model family |
 | D22 | Secret scanning | A secret scanner runs before every push (section 9.4) |
+| D23 | Legacy `.doc` support (resolves O2) | **DOCX only.** No LibreOffice, no `.doc` support |
+| D24 | Default providers (resolves O3) | **Self-hosted Ollama**, run as a compose service (`ollama`, section 8.1), used for `LLM_*`, `EMBEDDING_*`, and `AGENT_LLM_*` alike. This is the documented, verified-working pattern for Graphiti against an OpenAI-compatible local server (Zep's own Ollama integration guide: `OpenAIGenericClient` + `OpenAIEmbedder`, both pointed at `http://ollama:11434/v1`), and it needs no external key. `.env.example` ships these as the working example (dummy `LLM_API_KEY`/`EMBEDDING_API_KEY`, since Ollama ignores the key field). The owner may still override any of the six endpoints in their own `.env` to point at OpenAI or another hosted OpenAI-compatible service instead — nothing in the code changes either way (D10) |
 
-### 2.2 Open
-
-| # | Question | Options | Blocks |
-|---|---|---|---|
-| O2 | **Legacy `.doc` support.** Only DOCX is planned by default. | (a) DOCX only. (b) Add `.doc` via LibreOffice headless in the backend image (larger image) | Phase 1 |
-| O3 | **Concrete providers.** Which OpenAI-compatible endpoints and keys? | Owner fills `.env`. Examples: OpenAI, Ollama (`http://ollama:11434/v1`), any hosted OpenAI-compatible service | Phase 3 onward (any live run) |
-
-Anthropic note for O3: Anthropic has no embeddings API. Its chat models can be used through an OpenAI-compatible endpoint, but embeddings must come from another provider.
+Anthropic note for D24: Anthropic has no embeddings API, and Graphiti's structured-output calls need `OpenAIGenericClient` (schema injected into the prompt) rather than the plain `OpenAIClient`, for any non-OpenAI OpenAI-compatible endpoint, Ollama included.
 
 ---
 
 ## 3. Scope
 
 ### 3.1 In scope
-- Upload, list, delete documents (PDF, TXT, DOCX; `.doc` only if O2 says so)
+- Upload, list, delete documents (PDF, TXT, DOCX only — no legacy `.doc`, per D23)
 - Text extraction with server-side type and size checks
 - Insertion into Graphiti, with per-chunk tracking in MySQL
 - Startup recovery of interrupted insertions
@@ -131,6 +126,7 @@ live_graph_agent_chat/
 ├─ compose/
 │  ├─ neo4j.yml
 │  ├─ mysql.yml
+│  ├─ ollama.yml
 │  ├─ langfuse-data.yml
 │  ├─ langfuse-app.yml
 │  ├─ backend.yml
@@ -208,7 +204,7 @@ Every variable below is required unless marked optional. Code must not define de
 |---|---|
 | `MAX_DOCUMENTS` | Maximum stored documents |
 | `MAX_FILE_SIZE_MB` | Maximum size per upload |
-| `ALLOWED_EXTENSIONS` | e.g. `pdf,txt,docx` (add `doc` only if O2 says so) |
+| `ALLOWED_EXTENSIONS` | `pdf,txt,docx` (per D23, no `doc`) |
 | `INGEST_CHUNK_CHARS` | Characters per Graphiti episode |
 | `INGEST_RETRIES` | Attempts per document for transient failures |
 | `AGENT_MAX_REWRITES` | Maximum query rewrites per question |
@@ -236,26 +232,26 @@ Every variable below is required unless marked optional. Code must not define de
 | `NEO4J_DATABASE` | e.g. `neo4j` |
 
 ### 5.5 Extraction and embedding models (Graphiti)
-| Variable | Purpose |
-|---|---|
-| `LLM_BASE_URL` | OpenAI-compatible base URL |
-| `LLM_API_KEY` | Secret. May be a dummy value for local servers that ignore it |
-| `LLM_MODEL` | Model name the endpoint expects |
-| `LLM_SMALL_MODEL` | Cheaper model Graphiti uses for some steps |
-| `LLM_TEMPERATURE` | Usually `0` for extraction |
-| `EMBEDDING_BASE_URL` | OpenAI-compatible `/embeddings` base URL |
-| `EMBEDDING_API_KEY` | Secret |
-| `EMBEDDING_MODEL` | Embedding model name |
+| Variable | Purpose | `.env.example` default (D24) |
+|---|---|---|
+| `LLM_BASE_URL` | OpenAI-compatible base URL | `http://ollama:11434/v1` |
+| `LLM_API_KEY` | Secret. May be a dummy value for local servers that ignore it | `ollama` (ignored) |
+| `LLM_MODEL` | Model name the endpoint expects | `llama3.1` |
+| `LLM_SMALL_MODEL` | Cheaper model Graphiti uses for some steps | `llama3.1` |
+| `LLM_TEMPERATURE` | Usually `0` for extraction | `0` |
+| `EMBEDDING_BASE_URL` | OpenAI-compatible `/embeddings` base URL | `http://ollama:11434/v1` |
+| `EMBEDDING_API_KEY` | Secret | `ollama` (ignored) |
+| `EMBEDDING_MODEL` | Embedding model name | `nomic-embed-text` |
 
 Warning for the owner: the embedding vector size is a fixed constant in Graphiti (`EMBEDDING_DIM`). It is not configurable from `.env`. Switching to an embedding model with a different vector size requires clearing the Neo4j database and re-inserting all documents.
 
 ### 5.6 Agent model
-| Variable | Purpose |
-|---|---|
-| `AGENT_LLM_BASE_URL` | OpenAI-compatible base URL |
-| `AGENT_LLM_API_KEY` | Secret |
-| `AGENT_LLM_MODEL` | |
-| `AGENT_LLM_TEMPERATURE` | |
+| Variable | Purpose | `.env.example` default (D24) |
+|---|---|---|
+| `AGENT_LLM_BASE_URL` | OpenAI-compatible base URL | `http://ollama:11434/v1` |
+| `AGENT_LLM_API_KEY` | Secret | `ollama` (ignored) |
+| `AGENT_LLM_MODEL` | | `llama3.1` |
+| `AGENT_LLM_TEMPERATURE` | | `0` |
 
 ### 5.7 Langfuse (self-hosted)
 | Variable | Purpose |
@@ -477,7 +473,7 @@ Pick the latest stable release of each, then run the vulnerability check (sectio
 
 ## 8. Docker Compose
 
-The compose setup is split into one fragment per service group so each change touches one file. The root `docker-compose.yml` lists the fragments with `include:` (requires Docker Compose 2.20 or newer). Fragments live in `compose/`: `neo4j.yml`, `mysql.yml`, `langfuse-data.yml`, `langfuse-app.yml`, `backend.yml`, `frontend.yml`.
+The compose setup is split into one fragment per service group so each change touches one file. The root `docker-compose.yml` lists the fragments with `include:` (requires Docker Compose 2.20 or newer). Fragments live in `compose/`: `neo4j.yml`, `mysql.yml`, `ollama.yml`, `langfuse-data.yml`, `langfuse-app.yml`, `backend.yml`, `frontend.yml`.
 
 The sub-agent writes these files, plus `backend/Dockerfile`, `frontend/Dockerfile`, and `frontend/nginx.conf.template`. The sub-agent does **not** run any `docker` or `docker compose` command. It may check YAML syntax with a parser.
 
@@ -487,6 +483,7 @@ The sub-agent writes these files, plus `backend/Dockerfile`, `frontend/Dockerfil
 |---|---|---|
 | `neo4j` | `neo4j:5` | Ports bound to `127.0.0.1` only. Data volume |
 | `mysql` | `mysql:8.4` (LTS) | Ports bound to `127.0.0.1`. Data volume. Healthcheck with `mysqladmin ping`. Creates `MYSQL_DATABASE` and `MYSQL_USER` on first start |
+| `ollama` | `ollama/ollama:0.x.x` (pin exact tag at implementation time, like `neo4j`/`mysql`) | Default LLM/embedding/agent provider (D24). Ports bound to `127.0.0.1`. Data volume for pulled models. A one-shot init command (listed in 8.2) pulls `LLM_MODEL` and `EMBEDDING_MODEL` after first start — the compose file itself does not pull models |
 | `postgres` | `postgres:${POSTGRES_VERSION}` (17 in upstream Langfuse) | Langfuse database. Healthcheck `pg_isready` |
 | `clickhouse` | `clickhouse/clickhouse-server:25.12` (upstream Langfuse tag) | Healthcheck on `/ping`. Ports bound to localhost |
 | `redis` | `redis:7` | `--requirepass ${REDIS_AUTH}`. Ports bound to localhost |
@@ -514,7 +511,11 @@ cp .env.example .env
 openssl rand -hex 32   # use for API_TOKEN, SALT, ENCRYPTION_KEY, NEXTAUTH_SECRET, passwords as needed
 
 # 2. Start infrastructure first
-docker compose up -d neo4j mysql postgres clickhouse redis minio langfuse-web langfuse-worker
+docker compose up -d neo4j mysql ollama postgres clickhouse redis minio langfuse-web langfuse-worker
+
+# 2b. Pull the Ollama models named in .env (default example: llama3.1, nomic-embed-text)
+docker compose exec ollama ollama pull llama3.1
+docker compose exec ollama ollama pull nomic-embed-text
 
 # 3. Open Langfuse at http://localhost:3000, create a project,
 #    copy its public and secret keys into .env (LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY)

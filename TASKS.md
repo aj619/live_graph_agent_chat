@@ -17,9 +17,9 @@ Status key: `[ ]` not started, `[x]` done.
 
 | ID | Task | File | Depends on | Done when |
 |---|---|---|---|---|
-| [ ] T0.1 | **[OWNER]** Decide `.doc` support (O2: DOCX only, or add LibreOffice). Record in plan §2.2 | `PLAN_OF_ACTION.md` | none | O2 marked resolved |
+| [x] T0.1 | **[OWNER]** Decide `.doc` support (O2: DOCX only, or add LibreOffice). Record in plan §2.2 | `PLAN_OF_ACTION.md` | none | O2 marked resolved |
 | [ ] T0.2 | **[OWNER]** Give the concrete LLM, embedding, and agent endpoints and keys (O3). Fill them into `.env` after T1.2 exists | `.env` (owner-created) | T1.2 | `.env` contains all §5.5 and §5.6 values |
-| [ ] T0.3 | **[OWNER]** Say "go" to start implementation | none | T0.1 | Written instruction in chat |
+| [x] T0.3 | **[OWNER]** Say "go" to start implementation | none | T0.1 | Written instruction in chat |
 
 ---
 
@@ -27,7 +27,7 @@ Status key: `[ ]` not started, `[x]` done.
 
 | ID | Task | File | Depends on | Done when |
 |---|---|---|---|---|
-| [ ] T1.0 | **[DRIVER]** Initialise the git repository on branch `main`. First commit: `PLAN_OF_ACTION.md`, `TASKS.md`, `AGENT.md`, `.claude/`. Do not commit `.claude/state/` | repository | T0.3 | `git log` shows one commit on `main` |
+| [x] T1.0 | **[DRIVER]** Initialise the git repository on branch `main`. First commit: `PLAN_OF_ACTION.md`, `TASKS.md`, `AGENT.md`, `.claude/`. Do not commit `.claude/state/` | repository | T0.3 | `git log` shows one commit on `main` |
 | [ ] T1.1 | Create root ignore rules: `.env`, `.env.test`, `data/`, `.venv/`, `node_modules/`, `frontend/dist/`, `__pycache__/`, `.pytest_cache/`, `.mypy_cache/`, `.ruff_cache/`, `.claude/state/`, `STATUS.md`, `FINAL_REPORT.md` | `.gitignore` | T1.0 | Patterns present; no other file touched |
 | [ ] T1.2 | Create `.env.example` with every variable from plan §5.1 to §5.8, including `APP_ENV=dev`. Placeholders only, with a comment above each group | `.env.example` | T0.3 | Every required variable appears exactly once |
 | [ ] T1.3 | Create `backend/pyproject.toml` for uv: Python `>=3.14`, `package = false`, runtime deps: fastapi, uvicorn, pydantic-settings, python-dotenv, graphiti-core, neo4j, langgraph, langchain-core, langchain-openai, langfuse, pypdf, python-docx, python-multipart, sse-starlette, **sqlalchemy, pymysql** | `backend/pyproject.toml` | T0.3 | File parses as TOML; no build section |
@@ -144,6 +144,7 @@ Note: T2.19 changes the same file as T2.18. It runs after T2.18.
 | [ ] T3.3 | Compose root: `docker-compose.yml` with `include:` for each fragment, one shared network, named volumes list | `docker-compose.yml` | T1.12 | YAML parses (checked with a YAML parser) |
 | [ ] T3.4 | Compose fragment for Neo4j 5 (ports on `127.0.0.1`, data volume, healthcheck) | `compose/neo4j.yml` | T3.3 | YAML parses |
 | [ ] T3.5 | Compose fragment for MySQL 8.4 (ports on `127.0.0.1`, data volume, healthcheck with `mysqladmin ping`, database and user from `.env`) | `compose/mysql.yml` | T3.3 | YAML parses |
+| [ ] T3.5b | Compose fragment for Ollama (D24 default provider): pinned `ollama/ollama` tag, ports on `127.0.0.1`, data volume for pulled models, healthcheck | `compose/ollama.yml` | T3.3 | YAML parses |
 | [ ] T3.6 | Compose fragment for Langfuse data services: postgres, clickhouse, redis, minio, with healthchecks and localhost-only ports | `compose/langfuse-data.yml` | T3.3 | YAML parses |
 | [ ] T3.7 | Compose fragment for Langfuse app services: `langfuse-web` (port 3000) and `langfuse-worker` | `compose/langfuse-app.yml` | T3.6 | YAML parses; env names match upstream |
 | [ ] T3.8 | Compose fragment for the backend: build from T3.1, `env_file: .env`, `DATA_DIR` volume, depends on Neo4j and MySQL healthy, localhost port 8000 | `compose/backend.yml` | T3.1, T3.4, T3.5 | YAML parses |
@@ -317,8 +318,10 @@ Checked against the revised plan. Gaps found and fixed:
 10. **Security headers task.** Plan §9.3 says the backend sends `nosniff` and `no-referrer`, so T2.30 and T2.31 cover this, separately from nginx.
 11. **Test coverage.** Each module in the plan has a test task, and the recovery and insertion rules have tests of their own (T2.T10 to T2.T12).
 
+Resolved, carried into the plan as decisions (no longer open):
+- **O2 → D23 (`.doc` support)**: DOCX only. T2.4 extracts PDF/TXT/DOCX and raises on anything else; no DOC branch.
+- **O3 → D24 (provider endpoints and keys)**: self-hosted Ollama is the `.env.example` default (T1.2), with an `ollama` compose service (T3.5b). The owner can still override to a hosted provider in their own `.env`; T0.2 (copying `.env.example` to `.env`) is still an owner action.
+
 Still open, not solved by tasks:
-- **O2 (`.doc` support)** changes T2.4 and the backend Dockerfile.
-- **O3 (provider endpoints and keys)** blocks any live run.
 - **Embedding dimension** is fixed by Graphiti. Changing the embedding model needs a fresh Neo4j volume. Listed as a limitation in T10.4.
 - **MySQL schema changes** have no migration path in this scope. A change means dropping the MySQL volume, as stated in plan §6.7.
