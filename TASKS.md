@@ -34,7 +34,7 @@ Status key: `[ ]` not started, `[x]` done.
 | [x] T1.4 | Add dev group and tool settings (pytest, pytest-asyncio, httpx, ruff, mypy) to `backend/pyproject.toml`, registering the pytest markers `integration` and `live` | `backend/pyproject.toml` | T1.3 | Only the dev group and `[tool.*]` sections added; markers listed |
 | [x] T1.5 | Generate `backend/uv.lock` on Python 3.14 | `backend/uv.lock` | T1.4 | `uv lock` succeeds |
 | [x] T1.6 | Create the vulnerability check script: queries OSV (`POST https://api.osv.dev/v1/query`) for each pinned PyPI or npm package in a lock file, exits non-zero on any advisory, prints a table | `scripts/check_vulns.py` | T0.3 | Flags a canary `django==3.2.0` input; passes clean on real input |
-| [ ] T1.7 | Run the check on `backend/uv.lock` (includes SQLAlchemy and PyMySQL) and write the result into `SECURITY_CHECK.md` | `SECURITY_CHECK.md` | T1.5, T1.6 | Zero advisories, or each handled by changing the version |
+| [x] T1.7 | Run the check on `backend/uv.lock` (includes SQLAlchemy and PyMySQL) and write the result into `SECURITY_CHECK.md` | `SECURITY_CHECK.md` | T1.5, T1.6 | Zero advisories, or each handled by changing the version |
 | [x] T1.8 | Create `frontend/package.json` with React, TypeScript, Vite, `@vitejs/plugin-react`, Cytoscape.js, ESLint (`eslint`, `typescript-eslint`, `eslint-plugin-react-hooks`), Vitest, Testing Library, jsdom. No axios | `frontend/package.json` | T0.3 | `npm install` succeeds; no `axios` in the tree |
 | [ ] T1.9 | Create `frontend/tsconfig.json` with strict mode | `frontend/tsconfig.json` | T1.8 | `npx tsc --noEmit` runs |
 | [ ] T1.10 | Create `frontend/eslint.config.js` | `frontend/eslint.config.js` | T1.8 | `npx eslint .` runs |
