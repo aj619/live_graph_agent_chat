@@ -43,8 +43,10 @@ Shared files are changed only by the driver. Workers report what they need from 
 - **Repository first.** Task T1.0 is done by the driver before any worker runs: `git init` on `main`, with the planning documents and `.claude/` as the first commit. No worktree can be created before this.
 - **Pilot first.** The first cycle runs **one** worker on **Phase 1, task T1.1**. The driver reviews its output and cost before any further cycle.
 - After the pilot, at most **2** workers run at once (backend and frontend are the usual pair). Raise this only after the owner agrees, in chat, and record the decision in `STATUS.md`.
-- At most **4** agent runs per cycle, including retries.
-- **Daily cap: 48 agent runs per day** (about one full day of 30-minute cycles at 1 run each). The owner can change this in this file. The driver never raises it on its own. When the cap is reached, stop the loop and report it.
+- **5 agent runs per cycle, including retries.** Any ready task beyond those 5 is not started. The driver records it in `STATUS.md` as **failed** with the reason "cycle run cap reached". Such a record does not count toward the task's two-attempt limit, because no worker ran.
+- **Manual start only.** The owner starts the loop by hand, after setting the driver model. The driver never starts itself, and it does not restart after it stops.
+- **One branch per task.** Every task gets its own branch, `task/<ID>`, created from `main` in its own worktree. Two tasks never share a branch, and no branch is used by more than one worker.
+- **Daily cap: 48 agent runs per day.** The owner can change this in this file. The driver never raises it on its own. When the cap is reached, stop the loop and report it.
 
 ## One cycle
 
@@ -67,6 +69,7 @@ Shared files are changed only by the driver. Workers report what they need from 
 - **Run files:** `/home/beast/Projects/Softwares/Portfolio/live_graph_agent_chat/.claude/state/runs/<ID>-<attempt>.md`. Create the folder if it does not exist.
 - **Brief every spawn** with the template below. Do not pass only an ID and a path.
 - Run agents in parallel only when they touch different files and the concurrency cap allows it.
+- Count the runs you start against the 5-run cap before each spawn. Stop starting runs when the cap is reached.
 
 #### Brief template
 ```
@@ -119,6 +122,7 @@ Add `STATUS.md`, `.claude/state/`, and `.claude/state/runs/` to `.gitignore`. Do
 ### 9. Stop condition
 - If no task is ready, nothing is running, and every remaining task is owner-only or blocked, stop the loop (ScheduleWakeup with `stop: true`) and report it.
 - If the daily cap is reached, stop the loop and report it.
+- When the loop stops, it stays stopped until the owner starts it again.
 - If nothing changed this cycle, use `noop: true`.
 
 ## Owner-only items, always listed
