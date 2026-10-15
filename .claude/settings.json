@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(python3 scripts/check_vulns.py:*)",
+      "Bash(gitleaks:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git branch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git worktree:*)",
+      "Bash(git rebase:*)",
+      "Bash(git merge:*)",
+      "Bash(git revert:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Write(//home/beast/Projects/Softwares/Portfolio/live_graph_agent_chat/.claude/state/runs/**)",
+      "Edit(//home/beast/Projects/Softwares/Portfolio/live_graph_agent_chat/.claude/state/runs/**)",
+      "Write(//home/beast/Projects/Softwares/Portfolio/lgac-worktrees/**)",
+      "Edit(//home/beast/Projects/Softwares/Portfolio/lgac-worktrees/**)"
+    ],
+    "deny": [
+      "Bash(docker:*)",
+      "Bash(docker-compose:*)",
+      "Bash(git push:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(rm -rf:*)",
+      "Read(./.env)",
+      "Read(./.env.test)",
+      "Edit(./.env)",
+      "Edit(./.env.test)",
+      "Write(./.env)",
+      "Write(./.env.test)"
+    ]
+  }
+}

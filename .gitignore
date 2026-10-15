@@ -1,0 +1,34 @@
+# Secrets: real values only. The *.example files are committed.
+.env
+.env.test
+
+# Runtime data: uploads and the local SQLite/MySQL volumes
+data/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/coverage/
+*.tsbuildinfo
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Agent working files (local only)
+.claude/state/
+.claude/settings.local.json
+STATUS.md
+FINAL_REPORT.md
