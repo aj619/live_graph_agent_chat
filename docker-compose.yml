@@ -1,0 +1,28 @@
+# Root Compose file for the Live Graph Agent Chat stack.
+# Requires Docker Compose 2.20 or newer (for `include:`).
+# Each service group lives in its own fragment under compose/.
+# Ports and container names come from .env (or .env.test with -p lgac-test).
+
+name: lgac
+
+include:
+  - compose/neo4j.yml
+  - compose/mysql.yml
+  - compose/ollama.yml
+  - compose/langfuse-data.yml
+  - compose/langfuse-app.yml
+  - compose/backend.yml
+  - compose/frontend.yml
+
+networks:
+  lgac:
+    driver: bridge
+
+volumes:
+  lgac_neo4j_data: {}
+  lgac_mysql_data: {}
+  lgac_ollama_data: {}
+  lgac_postgres_data: {}
+  lgac_clickhouse_data: {}
+  lgac_minio_data: {}
+  lgac_backend_data: {}
