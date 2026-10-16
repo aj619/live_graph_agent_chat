@@ -14,14 +14,18 @@ clients the caller does not supply are built from Settings through
 `build_model_clients()`, which the caller can also override.
 """
 
+import logging
 from datetime import UTC, datetime
 
 from graphiti_core import Graphiti
 from graphiti_core.driver.neo4j_driver import Neo4jDriver
+from graphiti_core.errors import NodeNotFoundError
 from graphiti_core.nodes import EpisodeType
 
 from app.config import Settings, settings
 from app.models import ModelClients, build_model_clients
+
+logger = logging.getLogger(__name__)
 
 
 class GraphService:
@@ -91,3 +95,18 @@ class GraphService:
             group_id=self._group_id,
             uuid=episode_uuid,
         )
+
+    async def remove_episode(self, episode_uuid: str) -> None:
+        """Remove one episode from the graph. A missing episode counts as success.
+
+        Graphiti looks the episode up first and raises NodeNotFoundError when no
+        episode has that UUID. A pending chunk may never have been written, so
+        that case is logged and treated as already removed. Other errors propagate.
+
+        Args:
+            episode_uuid: The UUID of the episode to remove.
+        """
+        try:
+            await self.graphiti.remove_episode(episode_uuid)
+        except NodeNotFoundError:
+            logger.info("episode %s not found, treating as already removed", episode_uuid)
