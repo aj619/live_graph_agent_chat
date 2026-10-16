@@ -38,7 +38,7 @@ word counts as NO. A reply with no facts is NO and makes no model call.
 
 import re
 from collections.abc import Awaitable, Callable
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
@@ -131,3 +131,50 @@ def make_grade_node(llm: ChatOpenAI) -> Callable[[AgentState], Awaitable[AgentSt
         return {**state, "grounded": parse_verdict(content)}
 
     return grade
+
+
+def _rewrite_prompt(question: str, query: str) -> str:
+    """Build the rewrite prompt from the question and the query that found too little."""
+    return (
+        f"The search query '{query}' for the question '{question}' did not return "
+        "enough facts to answer it. Suggest a short, different search query (a few "
+        "words) that might find better results. Reply with only the new query, "
+        "nothing else."
+    )
+
+
+def make_rewrite_node(llm: ChatOpenAI) -> Callable[[AgentState], Awaitable[AgentState]]:
+    """Return the rewrite node, which asks the agent LLM for a new search query.
+
+    The reply is stripped of whitespace and used as the new `query`. If the reply
+    is empty after stripping, `query` falls back to the original `question`, the
+    safe default. `rewrites` goes up by one. `retrieved` and `grounded` are not
+    touched here. The next retrieve and grade passes recompute them.
+
+    Args:
+        llm: The agent chat model. Only its async `ainvoke` is used.
+    """
+
+    async def rewrite(state: AgentState) -> AgentState:
+        response = await llm.ainvoke(
+            _rewrite_prompt(state["question"], state["query"]),
+            config={"callbacks": get_callback_handlers()},
+        )
+        content = response.content if isinstance(response.content, str) else str(response.content)
+        new_query = content.strip() or state["question"]
+        return {**state, "query": new_query, "rewrites": state["rewrites"] + 1}
+
+    return rewrite
+
+
+def route_after_grade(state: AgentState) -> Literal["answer", "rewrite"]:
+    """Return the next node after grade: "answer" or "rewrite".
+
+    Returns "answer" when `grounded` is True, or when `rewrites` has reached
+    `AGENT_MAX_REWRITES`. The limit check is what stops the rewrite to retrieve
+    loop. Otherwise returns "rewrite". This is a pure decision with no LLM call.
+    The graph wiring that uses it is added in a later task.
+    """
+    if state["grounded"] or state["rewrites"] >= settings.AGENT_MAX_REWRITES:
+        return "answer"
+    return "rewrite"
