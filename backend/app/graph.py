@@ -15,17 +15,34 @@ clients the caller does not supply are built from Settings through
 """
 
 import logging
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from graphiti_core import Graphiti
 from graphiti_core.driver.neo4j_driver import Neo4jDriver
 from graphiti_core.errors import NodeNotFoundError
 from graphiti_core.nodes import EpisodeType, EpisodicNode
+from graphiti_core.search.search_config_recipes import COMBINED_HYBRID_SEARCH_CROSS_ENCODER
 
 from app.config import Settings, settings
 from app.models import ModelClients, build_model_clients
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class RetrieveResult:
+    """The IDs and facts returned by one hybrid search.
+
+    `facts` and `edge_ids` are parallel lists. `episode_uuids_by_edge` maps each
+    edge UUID to the UUIDs of the episodes that reference it. Mapping those
+    episode UUIDs to document IDs is left to the caller.
+    """
+
+    node_ids: list[str] = field(default_factory=list)
+    edge_ids: list[str] = field(default_factory=list)
+    facts: list[str] = field(default_factory=list)
+    episode_uuids_by_edge: dict[str, list[str]] = field(default_factory=dict)
 
 
 class GraphService:
@@ -58,6 +75,7 @@ class GraphService:
             graph_driver=self.driver,
         )
         self._group_id = cfg.GRAPH_GROUP_ID
+        self._retrieval_limit = cfg.RETRIEVAL_LIMIT
 
     async def start(self) -> None:
         """Create the Neo4j indices and constraints. Needs a reachable Neo4j."""
@@ -123,3 +141,32 @@ class GraphService:
             await self.graphiti.remove_episode(episode_uuid)
         except NodeNotFoundError:
             logger.info("episode %s not found, treating as already removed", episode_uuid)
+
+    async def retrieve(self, query: str) -> RetrieveResult:
+        """Run the cross-encoder hybrid search, limited to this service's group.
+
+        The recipe is copied with `limit` set from `RETRIEVAL_LIMIT`. Only edges
+        carry facts and episode references, so the per-edge episode UUIDs are
+        taken from each edge's `episodes` list.
+
+        Args:
+            query: The search text.
+
+        Returns:
+            The node UUIDs, the edge UUIDs, the fact text of each edge, and the
+            episode UUIDs of each edge.
+        """
+        config = COMBINED_HYBRID_SEARCH_CROSS_ENCODER.model_copy(
+            update={"limit": self._retrieval_limit}
+        )
+        results = await self.graphiti.search_(
+            query,
+            config=config,
+            group_ids=[self._group_id],
+        )
+        return RetrieveResult(
+            node_ids=[node.uuid for node in results.nodes],
+            edge_ids=[edge.uuid for edge in results.edges],
+            facts=[edge.fact for edge in results.edges],
+            episode_uuids_by_edge={edge.uuid: list(edge.episodes) for edge in results.edges},
+        )
