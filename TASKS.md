@@ -57,7 +57,7 @@ Status key: `[ ]` not started, `[x]` done.
 | [ ] T2.4 | Text extraction for PDF, TXT, DOCX with magic-byte and parser checks. Raises `UnsupportedDocument`. DOC handling follows T0.1 | `backend/app/extract.py` | T1.5, T0.1 | Each supported type extracts; wrong bytes raise |
 | [x] T2.5 | Database engine: SQLAlchemy 2 engine with PyMySQL, `utf8mb4`, pooled connections, session factory built from `Settings` | `backend/app/db.py` | T2.1 | Engine URL built from settings with the password not logged |
 | [x] T2.6 | Registry tables and operations: `documents` and `insertion_chunks` (plan §6.5). Methods: create document, set status and progress, record pending chunk, mark chunk inserted, list documents, list tracked chunks by document, delete document with cascade, count documents. `create_all` at startup | `backend/app/registry.py` | T2.5 | Schema created on first start; methods covered by T2.T6 |
-| [ ] T2.7 | Event bus: publish to all subscribers, per-subscriber bounded queue, drop a stalled subscriber without raising, keep-alive comment every 15 s | `backend/app/events.py` | T1.5 | Stream yields connected comment, events, keep-alive |
+| [x] T2.7 | Event bus: publish to all subscribers, per-subscriber bounded queue, drop a stalled subscriber without raising, keep-alive comment every 15 s | `backend/app/events.py` | T1.5 | Stream yields connected comment, events, keep-alive |
 | [ ] T2.8 | In-memory rate limiter keyed by API token, used for chat only | `backend/app/ratelimit.py` | T1.5 | Allows N per window, then refuses |
 | [ ] T2.9 | Auth dependency: compare `X-API-Token` to `API_TOKEN` with constant-time compare; 401 otherwise. Health excluded | `backend/app/auth.py` | T2.1 | Wrong or missing token returns 401 |
 | [ ] T2.10 | Tracing helpers: Langfuse `CallbackHandler` when `LANGFUSE_ENABLED=true`, otherwise an empty list. An `observe` wrapper that is a no-op when disabled | `backend/app/tracing.py` | T2.1 | Disabled mode attaches no callbacks |
@@ -66,7 +66,7 @@ Status key: `[ ]` not started, `[x]` done.
 
 | ID | Task | File | Depends on | Done when |
 |---|---|---|---|---|
-| [ ] T2.11 | Model client factory: Graphiti's LLM client, embedder, and reranker built from `Settings`, all through OpenAI-compatible base URLs. Accepts an injected override for tests | `backend/app/models.py` | T2.1 | Returns three clients; no provider name in code |
+| [x] T2.11 | Model client factory: Graphiti's LLM client, embedder, and reranker built from `Settings`, all through OpenAI-compatible base URLs. Accepts an injected override for tests | `backend/app/models.py` | T2.1 | Returns three clients; no provider name in code |
 | [ ] T2.12 | `GraphService` lifecycle: construct Graphiti with `Neo4jDriver(database=...)`, `build_indices_and_constraints()` on start, `close()` on stop | `backend/app/graph.py` | T2.11 | Start and close run against a live Neo4j (T3.2) |
 | [ ] T2.13 | `GraphService.insert_episode(episode_uuid, name, body, source_description)`: calls `add_episode` with the caller-provided UUID, `group_id` from settings | `backend/app/graph.py` | T2.12 | Episode appears with that UUID (integration, T3.2) |
 | [ ] T2.14 | `GraphService.remove_episode(episode_uuid)`: calls Graphiti `remove_episode`; a missing episode is logged and treated as success | `backend/app/graph.py` | T2.12 | Missing UUID does not raise |
