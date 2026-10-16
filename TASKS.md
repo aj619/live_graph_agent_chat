@@ -41,7 +41,7 @@ Status key: `[ ]` not started, `[x]` done.
 | [x] T1.11 | Run the check on `frontend/package-lock.json` (and `npm audit`) and append the result to `SECURITY_CHECK.md` | `SECURITY_CHECK.md` | T1.8, T1.6 | Zero advisories, or each handled |
 | [x] T1.13 | Create `.env.test.example`: the test values from plan §5.9 (separate ports, `*_test` databases, `test_` graph group, test uploads path, `APP_ENV=test`), placeholders only | `.env.test.example` | T1.2 | Every §5.9 rule is reflected; no dev value copied |
 | [ ] T1.14 | Create the secret scan config (gitleaks format) covering the whole repository, including `.env.example` and `.env.test.example` | `.gitleaks.toml` | T1.1 | Config parses; placeholders are not flagged as findings |
-| [ ] T1.12 | List every container base image tag (Python 3.14, Node, nginx, neo4j 5, mysql 8.4, postgres, clickhouse, redis, minio, langfuse 4) in `SECURITY_CHECK.md`. Pinned tags, no `latest` | `SECURITY_CHECK.md` | T1.7 | Table complete |
+| [x] T1.12 | List every container base image tag (Python 3.14, Node, nginx, neo4j 5, mysql 8.4, postgres, clickhouse, redis, minio, langfuse 4) in `SECURITY_CHECK.md`. Pinned tags, no `latest` | `SECURITY_CHECK.md` | T1.7 | Table complete |
 
 ---
 
