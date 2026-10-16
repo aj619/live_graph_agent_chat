@@ -18,7 +18,7 @@ Status key: `[ ]` not started, `[x]` done.
 | ID | Task | File | Depends on | Done when |
 |---|---|---|---|---|
 | [x] T0.1 | **[OWNER]** Decide `.doc` support (O2: DOCX only, or add LibreOffice). Record in plan §2.2 | `PLAN_OF_ACTION.md` | none | O2 marked resolved |
-| [ ] T0.2 | **[OWNER]** Give the concrete LLM, embedding, and agent endpoints and keys (O3). Fill them into `.env` after T1.2 exists | `.env` (owner-created) | T1.2 | `.env` contains all §5.5 and §5.6 values |
+| [x] T0.2 | **[OWNER]** Give the concrete LLM, embedding, and agent endpoints and keys (O3). Fill them into `.env` after T1.2 exists | `.env` (owner-created) | T1.2 | `.env` contains all §5.5 and §5.6 values |
 | [x] T0.3 | **[OWNER]** Say "go" to start implementation | none | T0.1 | Written instruction in chat |
 
 ---
