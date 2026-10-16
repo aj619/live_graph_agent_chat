@@ -147,7 +147,7 @@ Note: T2.19 changes the same file as T2.18. It runs after T2.18.
 | [ ] T3.5b | Compose fragment for Ollama (D24 default provider): pinned `ollama/ollama` tag, ports on `127.0.0.1`, data volume for pulled models, healthcheck | `compose/ollama.yml` | T3.3 | YAML parses |
 | [ ] T3.6 | Compose fragment for Langfuse data services: postgres, clickhouse, redis, minio, with healthchecks and localhost-only ports | `compose/langfuse-data.yml` | T3.3 | YAML parses |
 | [ ] T3.7 | Compose fragment for Langfuse app services: `langfuse-web` (port 3000) and `langfuse-worker` | `compose/langfuse-app.yml` | T3.6 | YAML parses; env names match upstream |
-| [ ] T3.8 | Compose fragment for the backend: build from T3.1, `env_file: .env`, `DATA_DIR` volume, depends on Neo4j and MySQL healthy, localhost port 8000 | `compose/backend.yml` | T3.1, T3.4, T3.5 | YAML parses |
+| [x] T3.8 | Compose fragment for the backend: build from T3.1, `env_file: .env`, `DATA_DIR` volume, depends on Neo4j and MySQL healthy, localhost port 8000 | `compose/backend.yml` | T3.1, T3.4, T3.5 | YAML parses |
 | [ ] T3.9 | **[OWNER]** Start the test stack (`docker compose -p lgac-test --env-file .env.test up -d neo4j mysql`), then run `APP_ENV=test uv run --env-file ../.env.test pytest -m integration`. Dev stack is not touched | none | T3.2, T2.T6, T2.T20, T3.4, T3.5 | Owner reports pass, with the skipped count |
 | [ ] T3.10 | **[OWNER]** Confirm dev data is unchanged after the test run: document count and graph node count match the values recorded before it | none | T3.9 | Owner reports matching counts |
 
