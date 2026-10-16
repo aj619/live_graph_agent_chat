@@ -90,7 +90,7 @@ Note: T2.19 changes the same file as T2.18. It runs after T2.18.
 | [x] T2.20 | Agent state, agent LLM factory (`ChatOpenAI` from `AGENT_LLM_*`), and the `retrieve` and `grade` nodes with YES/NO parsing | `backend/app/agent.py` | T2.15, T2.10 | Grade returns False when there are no facts |
 | [x] T2.21 | Agent `rewrite` node (bounded by `AGENT_MAX_REWRITES`) and the conditional route `grade → answer | rewrite` | `backend/app/agent.py` | T2.20 | Loop stops at the limit |
 | [x] T2.22 | Agent `answer` node: publish `chat.sources` before any token, then stream `chat.token` events, answer restricted to supplied facts | `backend/app/agent.py` | T2.21, T2.7 | `chat.sources` precedes the first `chat.token` |
-| [ ] T2.23 | Agent `run`: compile the LangGraph, attach callbacks from T2.10, publish `chat.done`, or `chat.error` with a generic message on failure | `backend/app/agent.py` | T2.22 | Failure publishes `chat.error` and logs the traceback |
+| [x] T2.23 | Agent `run`: compile the LangGraph, attach callbacks from T2.10, publish `chat.done`, or `chat.error` with a generic message on failure | `backend/app/agent.py` | T2.22 | Failure publishes `chat.error` and logs the traceback |
 
 ### 2e. HTTP routes and app assembly
 
