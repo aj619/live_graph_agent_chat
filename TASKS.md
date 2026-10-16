@@ -79,7 +79,7 @@ Status key: `[ ]` not started, `[x]` done.
 |---|---|---|---|---|
 | [x] T2.17 | Insert service: one background task per upload, no queue. For each chunk: write a `pending` tracking row, call `insert_episode`, mark `inserted`, increment progress, emit `document.status` with `chunks_done` and `chunks_total`. Status `done` only when all chunks are inserted. Retries the failing chunk up to `INGEST_RETRIES`. `UnsupportedDocument` fails without retry. `@observe` on the insert function | `backend/app/insert.py` | T2.4, T2.3, T2.6, T2.7, T2.10, T2.13 | Failure on chunk 3 of 5 leaves chunks 1 and 2 `inserted` and status `failed` |
 | [x] T2.18 | Startup recovery: find documents with status `processing`; for each, remove every tracked episode (`pending` and `inserted`), delete its tracking rows, set status `interrupted` with the safe message. Idempotent; logs IDs and counts, never text | `backend/app/recovery.py` | T2.6, T2.14 | Second run is a no-op; a missing episode is skipped |
-| [ ] T2.19 | Document deletion path used by the API: remove tracked episodes, delete rows, delete the stored file. Lives with recovery's removal logic but is a separate function | `backend/app/recovery.py` | T2.18 | Removes episodes, rows, and file |
+| [x] T2.19 | Document deletion path used by the API: remove tracked episodes, delete rows, delete the stored file. Lives with recovery's removal logic but is a separate function | `backend/app/recovery.py` | T2.18 | Removes episodes, rows, and file |
 
 Note: T2.19 changes the same file as T2.18. It runs after T2.18.
 
