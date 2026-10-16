@@ -1,0 +1,31 @@
+# Neo4j 5 (graph store). Included by the root docker-compose.yml.
+# Network `lgac` and volume `lgac_neo4j_data` are declared in the root file.
+# Credentials come from .env (or .env.test with -p lgac-test).
+#
+# Known gap: the bolt host port is hard-coded to 7687 because NEO4J_URI in
+# .env.example / .env.test.example embeds the port in a URL and there is no
+# NEO4J_BOLT_PORT variable to interpolate. The dev and test stacks therefore
+# both publish 127.0.0.1:7687 and cannot run at the same time until a
+# dedicated port variable is added to both env examples.
+
+services:
+  neo4j:
+    image: neo4j:5.26.32-community
+    # No explicit container_name: Compose's <project>-<service>-<index> naming
+    # keeps dev (lgac) and test (lgac-test) containers apart.
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER}/${NEO4J_PASSWORD}
+    ports:
+      - "127.0.0.1:7687:7687"   # bolt (NEO4J_URI); see known gap above
+      - "127.0.0.1:7474:7474"   # browser UI, local debugging only
+    volumes:
+      - lgac_neo4j_data:/data
+    networks:
+      - lgac
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "${NEO4J_USER}", "-p", "${NEO4J_PASSWORD}", "RETURN 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
