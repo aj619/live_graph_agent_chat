@@ -103,7 +103,7 @@ Note: T2.19 changes the same file as T2.18. It runs after T2.18.
 | [x] T2.28 | Event route: `GET /api/events` streams the bus with `text/event-stream` and `Cache-Control: no-cache` | `backend/app/routes_events.py` | T2.7, T2.9 | Streams events in order |
 | [x] T2.29 | App factory and lifespan: create `DATA_DIR/uploads`, create the database engine and tables, start the graph service, **run startup recovery before serving**, stop the graph service on shutdown, register routers, CORS from `CORS_ORIGINS`, global exception handler returning a generic 500 and logging the traceback, logging setup | `backend/app/main.py` | T2.24 to T2.28, T2.2, T2.18 | `uvicorn app.main:app` starts with a valid `.env` and fails clearly without one |
 | [x] T2.30 | Security headers middleware for API responses: `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` | `backend/app/security_headers.py` | T2.1 | Headers present on every response |
-| [ ] T2.31 | Wire the security headers middleware into the app factory | `backend/app/main.py` | T2.29, T2.30 | Test T2.T16 passes |
+| [x] T2.31 | Wire the security headers middleware into the app factory | `backend/app/main.py` | T2.29, T2.30 | Test T2.T16 passes |
 | [x] T2.32 | Package marker | `backend/app/__init__.py` | T1.5 | File exists |
 
 ---
@@ -112,7 +112,7 @@ Note: T2.19 changes the same file as T2.18. It runs after T2.18.
 
 | ID | Task | File | Depends on | Done when |
 |---|---|---|---|---|
-| [ ] T2.T1 | Test fakes: fake graph service (in-memory episodes, `insert_episode`, `remove_episode`, `retrieve`, `snapshot`) that can be told to fail on the Nth call; fake chat model returning fixed YES/NO and tokens | `backend/tests/fakes.py` | T2.13 to T2.16, T2.20 | Used by the tests below |
+| [x] T2.T1 | Test fakes: fake graph service (in-memory episodes, `insert_episode`, `remove_episode`, `retrieve`, `snapshot`) that can be told to fail on the Nth call; fake chat model returning fixed YES/NO and tokens | `backend/tests/fakes.py` | T2.13 to T2.16, T2.20 | Used by the tests below |
 | [ ] T2.T2 | Test settings: every required variable set, missing one fails | `backend/tests/test_config.py` | T2.1 | Pass |
 | [ ] T2.T3 | Test logging redaction | `backend/tests/test_logging.py` | T2.2 | Pass |
 | [ ] T2.T4 | Test chunking limits and boundaries | `backend/tests/test_chunking.py` | T2.3 | Pass |
