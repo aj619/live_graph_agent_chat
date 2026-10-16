@@ -1,0 +1,37 @@
+# Rendered by the official nginx image's docker-entrypoint template mechanism:
+# files under /etc/nginx/templates/*.template are run through envsubst at
+# container start and written to /etc/nginx/conf.d/ with the suffix dropped.
+# Only variables that are actually set in the container environment are
+# substituted, so nginx's own $uri-style variables below are left untouched
+# (plan §6.4, §7.4: the browser never receives API_TOKEN; this container
+# injects it server-side when proxying /api).
+
+server {
+    listen 8080;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # MAX_FILE_SIZE_MB comes from the same .env the backend enforces the
+    # limit from, so nginx cannot reject a size the backend would accept.
+    client_max_body_size ${MAX_FILE_SIZE_MB}m;
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" always;
+
+    location /api/ {
+        proxy_pass http://backend:8000/api/;
+        proxy_set_header X-API-Token "${API_TOKEN}";
+        proxy_set_header Host $host;
+        proxy_http_version 1.1;
+        # GET /api/events is a long-lived SSE stream; buffering would delay
+        # every event until nginx's buffer filled or the connection closed.
+        proxy_buffering off;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

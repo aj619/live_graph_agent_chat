@@ -1,0 +1,263 @@
+:root {
+  --color-bg: #0f1115;
+  --color-panel: #171a21;
+  --color-border: #2a2f3a;
+  --color-text: #e6e8ec;
+  --color-muted: #9aa5b1;
+  --color-accent: #4f6df5;
+
+  --status-processing: #4f6df5;
+  --status-done: #2ecc71;
+  --status-failed: #e5484d;
+  --status-interrupted: #e5a500;
+
+  --highlight-color: #ffb020;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+#root {
+  height: 100vh;
+}
+
+.app-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
+  gap: 16px;
+  height: 100vh;
+  padding: 16px;
+}
+
+.panel {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+button {
+  background: var(--color-accent);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --- FileList --- */
+
+.file-list__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  overflow-y: auto;
+}
+
+.file-list__table th,
+.file-list__table td {
+  text-align: left;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.file-list__name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-list__empty {
+  color: var(--color-muted);
+  text-align: center;
+}
+
+.file-list__error,
+.file-list__doc-error {
+  color: var(--status-failed);
+  font-size: 0.8rem;
+  margin: 4px 0 0;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: #0f1115;
+}
+
+.status-badge--processing {
+  background: var(--status-processing);
+  color: #fff;
+}
+
+.status-badge--done {
+  background: var(--status-done);
+}
+
+.status-badge--failed {
+  background: var(--status-failed);
+  color: #fff;
+}
+
+.status-badge--interrupted {
+  background: var(--status-interrupted);
+}
+
+/* --- GraphView --- */
+
+.graph-view {
+  flex: 1;
+}
+
+.graph-view__toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.graph-view__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.graph-view__canvas {
+  flex: 1;
+  min-height: 0;
+  background: #0b0d11;
+  border-radius: 4px;
+}
+
+.graph-view__fact {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  margin: 6px 0 0;
+}
+
+/* --- ChatWidget --- */
+
+.chat-widget__messages {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-widget__empty {
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.chat-message {
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 0.85rem;
+}
+
+.chat-message--user {
+  background: var(--color-accent);
+  align-self: flex-end;
+  color: #fff;
+}
+
+.chat-message--assistant {
+  background: #20242e;
+  align-self: flex-start;
+}
+
+.chat-message__text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chat-message__error {
+  color: var(--status-failed);
+  margin: 4px 0 0;
+}
+
+.chat-message__sources {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chat-message__source-button {
+  background: transparent;
+  color: var(--color-muted);
+  border: 1px solid var(--color-border);
+  text-align: left;
+  width: 100%;
+  font-size: 0.75rem;
+}
+
+.chat-message__source-button:hover {
+  border-color: var(--highlight-color);
+  color: var(--color-text);
+}
+
+.chat-widget__form {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.chat-widget__form input {
+  flex: 1;
+  min-width: 0;
+  background: #0b0d11;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 6px 8px;
+}
+
+/* --- Responsive --- */
+
+@media (max-width: 760px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+    grid-auto-rows: minmax(260px, auto);
+    height: auto;
+    min-height: 100vh;
+    overflow-y: auto;
+    padding: 16px;
+  }
+}

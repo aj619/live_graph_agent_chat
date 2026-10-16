@@ -189,45 +189,45 @@ Note: T2.19 changes the same file as T2.18. It runs after T2.18.
 
 | ID | Task | File | Depends on | Done when |
 |---|---|---|---|---|
-| [ ] T7.1 | TypeScript types for documents (with `chunks_done`, `chunks_total`, and status values including `interrupted`), config, graph snapshot, and each SSE payload from plan §6.2 | `frontend/src/types.ts` | T1.9 | Compiles |
-| [ ] T7.2 | REST client with `fetch` and relative `/api` paths: `getConfig`, `listDocuments`, `uploadDocument`, `deleteDocument`, `getGraph`, `sendChat`. Non-2xx maps to a typed error | `frontend/src/api.ts` | T7.1 | Compiles; no axios import |
-| [ ] T7.3 | SSE parser over a `ReadableStream`: handles chunks split mid-line, multiple events per chunk, comment lines | `frontend/src/sse.ts` | T7.1 | Pure over a stream |
-| [ ] T7.4 | Event stream hook: opens `GET /api/events` with the fetch reader, reconnects with exponential backoff, calls a handler per event | `frontend/src/useEventStream.ts` | T7.3, T7.2 | Reconnects after a dropped stream |
-| [ ] T7.5 | Pure reducer for documents (with progress), graph, chat messages, highlight IDs | `frontend/src/state.ts` | T7.1 | Covered by T7.T2 |
-| [ ] T7.6 | Upload pre-check: size, extension, count against `/api/config` before any request | `frontend/src/limits.ts` | T7.1 | Rejects oversize and wrong type |
-| [ ] T7.7 | Highlight selector: pure function from `chat.sources` IDs to node and edge classes | `frontend/src/graphHighlight.ts` | T7.1 | Covered by T7.T3 |
+| [x] T7.1 | TypeScript types for documents (with `chunks_done`, `chunks_total`, and status values including `interrupted`), config, graph snapshot, and each SSE payload from plan §6.2 | `frontend/src/types.ts` | T1.9 | Compiles |
+| [x] T7.2 | REST client with `fetch` and relative `/api` paths: `getConfig`, `listDocuments`, `uploadDocument`, `deleteDocument`, `getGraph`, `sendChat`. Non-2xx maps to a typed error | `frontend/src/api.ts` | T7.1 | Compiles; no axios import |
+| [x] T7.3 | SSE parser over a `ReadableStream`: handles chunks split mid-line, multiple events per chunk, comment lines | `frontend/src/sse.ts` | T7.1 | Pure over a stream |
+| [x] T7.4 | Event stream hook: opens `GET /api/events` with the fetch reader, reconnects with exponential backoff, calls a handler per event | `frontend/src/useEventStream.ts` | T7.3, T7.2 | Reconnects after a dropped stream |
+| [x] T7.5 | Pure reducer for documents (with progress), graph, chat messages, highlight IDs | `frontend/src/state.ts` | T7.1 | Covered by T7.T2 |
+| [x] T7.6 | Upload pre-check: size, extension, count against `/api/config` before any request | `frontend/src/limits.ts` | T7.1 | Rejects oversize and wrong type |
+| [x] T7.7 | Highlight selector: pure function from `chat.sources` IDs to node and edge classes | `frontend/src/graphHighlight.ts` | T7.1 | Covered by T7.T3 |
 
 ### 7b. Components
 
 | ID | Task | File | Depends on | Done when |
 |---|---|---|---|---|
-| [ ] T7.8 | `FileList`: upload with `accept` from config, table with name, size, status badge, progress, delete | `frontend/src/components/FileList.tsx` | T7.6, T7.5 | Renders each status including `interrupted` |
-| [ ] T7.9 | `GraphView`: Cytoscape canvas, incremental updates keeping positions, fit and re-layout, highlight classes | `frontend/src/components/GraphView.tsx` | T7.7, T7.5 | Existing node positions unchanged after an update |
-| [ ] T7.10 | `ChatWidget`: messages, input, streamed tokens, source list, click-to-highlight. Plain-text rendering only | `frontend/src/components/ChatWidget.tsx` | T7.2, T7.5, T7.7 | Injected `<script>` renders as text |
-| [ ] T7.11 | `App` layout: three columns, wires the event hook, reducer, and components. Reloads documents and graph on reconnect | `frontend/src/App.tsx` | T7.4, T7.8, T7.9, T7.10 | Three panels rendered |
-| [ ] T7.12 | Entry point mounting `App` | `frontend/src/main.tsx` | T7.11 | `npm run build` succeeds |
-| [ ] T7.13 | HTML shell: title from `VITE_APP_TITLE`, strict CSP meta tag | `frontend/index.html` | T1.8 | Build output contains the CSP |
-| [ ] T7.14 | Styles: three columns collapsing at phone width, 16px gutter, no horizontal page scroll, status and highlight colour tokens | `frontend/src/styles.css` | T7.11 | Usable at 390px width |
+| [x] T7.8 | `FileList`: upload with `accept` from config, table with name, size, status badge, progress, delete | `frontend/src/components/FileList.tsx` | T7.6, T7.5 | Renders each status including `interrupted` |
+| [x] T7.9 | `GraphView`: Cytoscape canvas, incremental updates keeping positions, fit and re-layout, highlight classes | `frontend/src/components/GraphView.tsx` | T7.7, T7.5 | Existing node positions unchanged after an update |
+| [x] T7.10 | `ChatWidget`: messages, input, streamed tokens, source list, click-to-highlight. Plain-text rendering only | `frontend/src/components/ChatWidget.tsx` | T7.2, T7.5, T7.7 | Injected `<script>` renders as text |
+| [x] T7.11 | `App` layout: three columns, wires the event hook, reducer, and components. Reloads documents and graph on reconnect | `frontend/src/App.tsx` | T7.4, T7.8, T7.9, T7.10 | Three panels rendered |
+| [x] T7.12 | Entry point mounting `App` | `frontend/src/main.tsx` | T7.11 | `npm run build` succeeds |
+| [x] T7.13 | HTML shell: title from `VITE_APP_TITLE`, strict CSP meta tag | `frontend/index.html` | T1.8 | Build output contains the CSP |
+| [x] T7.14 | Styles: three columns collapsing at phone width, 16px gutter, no horizontal page scroll, status and highlight colour tokens | `frontend/src/styles.css` | T7.11 | Usable at 390px width |
 
 ### 7c. Dev proxy and frontend container
 
 | ID | Task | File | Depends on | Done when |
 |---|---|---|---|---|
-| [ ] T7.15 | Vite config: dev server 5173, `/api` proxy to `http://localhost:8000` injecting `X-API-Token` from the repo `.env` via `loadEnv`. Build does not read the token | `frontend/vite.config.ts` | T1.8 | Dev proxy forwards with header |
-| [ ] T7.16 | Nginx template: serve `dist`, proxy `/api` to `backend:8000`, inject `X-API-Token: ${API_TOKEN}`, security headers (nosniff, no-referrer, CSP), SPA fallback | `frontend/nginx.conf.template` | T7.12 | Renders with the official nginx template mechanism (owner checks in T8.1) |
-| [ ] T7.17 | Frontend multi-stage Dockerfile: Node build, nginx serve, template copied to `/etc/nginx/templates/` | `frontend/Dockerfile` | T7.16, T1.12 | Base tags pinned |
-| [ ] T7.18 | Compose fragment for the frontend: build from T7.17, port 5173 to nginx 8080, `API_TOKEN` via `env_file` | `compose/frontend.yml` | T7.17, T3.3 | YAML parses |
+| [x] T7.15 | Vite config: dev server 5173, `/api` proxy to `http://localhost:8000` injecting `X-API-Token` from the repo `.env` via `loadEnv`. Build does not read the token | `frontend/vite.config.ts` | T1.8 | Dev proxy forwards with header |
+| [x] T7.16 | Nginx template: serve `dist`, proxy `/api` to `backend:8000`, inject `X-API-Token: ${API_TOKEN}`, security headers (nosniff, no-referrer, CSP), SPA fallback | `frontend/nginx.conf.template` | T7.12 | Renders with the official nginx template mechanism (owner checks in T8.1) |
+| [x] T7.17 | Frontend multi-stage Dockerfile: Node build, nginx serve, template copied to `/etc/nginx/templates/` | `frontend/Dockerfile` | T7.16, T1.12 | Base tags pinned |
+| [x] T7.18 | Compose fragment for the frontend: build from T7.17, port 5173 to nginx 8080, `API_TOKEN` via `env_file` | `compose/frontend.yml` | T7.17, T3.3 | YAML parses |
 
 ### 7d. Frontend tests
 
 | ID | Task | File | Depends on | Done when |
 |---|---|---|---|---|
-| [ ] T7.T1 | Test `api.ts` error mapping and paths with mocked fetch | `frontend/tests/api.test.ts` | T7.2 | Pass |
-| [ ] T7.T2 | Test the reducer for each event type, including progress | `frontend/tests/state.test.ts` | T7.5 | Pass |
-| [ ] T7.T3 | Test the highlight selector: only IDs in `chat.sources` marked | `frontend/tests/graphHighlight.test.ts` | T7.7 | Pass |
-| [ ] T7.T4 | Test the SSE parser: split chunks, multiple events, comments | `frontend/tests/sse.test.ts` | T7.3 | Pass |
-| [ ] T7.T5 | Test the upload pre-check against each limit | `frontend/tests/limits.test.ts` | T7.6 | Pass |
-| [ ] T7.T6 | Test `ChatWidget` renders injected HTML as text | `frontend/tests/ChatWidget.test.tsx` | T7.10 | Pass |
+| [x] T7.T1 | Test `api.ts` error mapping and paths with mocked fetch | `frontend/tests/api.test.ts` | T7.2 | Pass |
+| [x] T7.T2 | Test the reducer for each event type, including progress | `frontend/tests/state.test.ts` | T7.5 | Pass |
+| [x] T7.T3 | Test the highlight selector: only IDs in `chat.sources` marked | `frontend/tests/graphHighlight.test.ts` | T7.7 | Pass |
+| [x] T7.T4 | Test the SSE parser: split chunks, multiple events, comments | `frontend/tests/sse.test.ts` | T7.3 | Pass |
+| [x] T7.T5 | Test the upload pre-check against each limit | `frontend/tests/limits.test.ts` | T7.6 | Pass |
+| [x] T7.T6 | Test `ChatWidget` renders injected HTML as text | `frontend/tests/ChatWidget.test.tsx` | T7.10 | Pass |
 
 ---
 
