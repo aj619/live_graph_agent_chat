@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from graphiti_core import Graphiti
 from graphiti_core.driver.neo4j_driver import Neo4jDriver
 from graphiti_core.errors import NodeNotFoundError
-from graphiti_core.nodes import EpisodeType
+from graphiti_core.nodes import EpisodeType, EpisodicNode
 
 from app.config import Settings, settings
 from app.models import ModelClients, build_model_clients
@@ -78,7 +78,9 @@ class GraphService:
         """Add one text episode to the graph under the caller's UUID.
 
         Writes no tracking row; the insert pipeline (plan §6.5) writes that
-        before and after this call.
+        before and after this call. graphiti-core 0.31.1 only accepts a `uuid`
+        for an episode that already exists, so a bare episode is saved under
+        that UUID first and then `add_episode` runs extraction against it.
 
         Args:
             episode_uuid: The UUID the caller generated for this episode.
@@ -86,11 +88,22 @@ class GraphService:
             body: The episode text (one chunk).
             source_description: Where the text came from.
         """
+        reference_time = datetime.now(UTC)
+        stub = EpisodicNode(
+            uuid=episode_uuid,
+            name=name,
+            group_id=self._group_id,
+            source=EpisodeType.text,
+            content=body,
+            source_description=source_description,
+            valid_at=reference_time,
+        )
+        await stub.save(self.driver)
         await self.graphiti.add_episode(
             name=name,
             episode_body=body,
             source_description=source_description,
-            reference_time=datetime.now(UTC),
+            reference_time=reference_time,
             source=EpisodeType.text,
             group_id=self._group_id,
             uuid=episode_uuid,
