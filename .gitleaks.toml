@@ -25,6 +25,4 @@ regexTarget = "secret"
 regexes = [
   # Literal placeholders written as changeme-... (generate-with-openssl, -64-hex-chars, -test variants).
   '''^changeme-[A-Za-z0-9-]+$''',
-  # Local Ollama endpoints ignore the key; the value is the literal word.
-  '''^ollama$''',
 ]
