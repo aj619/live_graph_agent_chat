@@ -129,7 +129,7 @@ Note: T2.19 changes the same file as T2.18. It runs after T2.18.
 | [ ] T2.T15 | Test system, graph, and chat routes | `backend/tests/test_routes_other.py` | T2.24, T2.26, T2.27, T2.T1 | Pass |
 | [x] T2.T16 | Test security headers on API responses | `backend/tests/test_security_headers.py` | T2.31 | Pass |
 | [ ] T2.T17 | Test SSE route yields events in order over an async client | `backend/tests/test_routes_events.py` | T2.28, T2.T1 | Pass |
-| [ ] T2.T18 | Test app startup: missing variable fails, valid settings create `DATA_DIR/uploads`, recovery runs before the first request | `backend/tests/test_main.py` | T2.29 | Pass |
+| [x] T2.T18 | Test app startup: missing variable fails, valid settings create `DATA_DIR/uploads`, recovery runs before the first request | `backend/tests/test_main.py` | T2.29 | Pass |
 | [x] T2.T19 | Test the global exception handler returns a generic 500 without a traceback | `backend/tests/test_main_errors.py` | T2.29 | Pass |
 | [x] T2.T20 | Test-environment guard, as a pytest fixture applied to every `integration` test: refuses to run unless `APP_ENV=test`, database names end in `_test`, and the graph group starts with `test_`. Integration tests that find no test stack are reported as "not verified" | `backend/tests/conftest.py` | T2.1, T1.13 | A run with dev settings stops with a clear error; a test-settings run proceeds |
 
