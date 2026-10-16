@@ -60,7 +60,7 @@ Status key: `[ ]` not started, `[x]` done.
 | [x] T2.7 | Event bus: publish to all subscribers, per-subscriber bounded queue, drop a stalled subscriber without raising, keep-alive comment every 15 s | `backend/app/events.py` | T1.5 | Stream yields connected comment, events, keep-alive |
 | [x] T2.8 | In-memory rate limiter keyed by API token, used for chat only | `backend/app/ratelimit.py` | T1.5 | Allows N per window, then refuses |
 | [x] T2.9 | Auth dependency: compare `X-API-Token` to `API_TOKEN` with constant-time compare; 401 otherwise. Health excluded | `backend/app/auth.py` | T2.1 | Wrong or missing token returns 401 |
-| [ ] T2.10 | Tracing helpers: Langfuse `CallbackHandler` when `LANGFUSE_ENABLED=true`, otherwise an empty list. An `observe` wrapper that is a no-op when disabled | `backend/app/tracing.py` | T2.1 | Disabled mode attaches no callbacks |
+| [x] T2.10 | Tracing helpers: Langfuse `CallbackHandler` when `LANGFUSE_ENABLED=true`, otherwise an empty list. An `observe` wrapper that is a no-op when disabled | `backend/app/tracing.py` | T2.1 | Disabled mode attaches no callbacks |
 
 ### 2b. Graph and model clients
 
