@@ -140,7 +140,7 @@ Note: T2.19 changes the same file as T2.18. It runs after T2.18.
 | ID | Task | File | Depends on | Done when |
 |---|---|---|---|---|
 | [x] T3.1 | Backend Dockerfile: Python 3.14 base (tag from T1.12), install from the lock with uv, run `uvicorn app.main:app --workers 1`, non-root user | `backend/Dockerfile` | T1.7, T2.29 | Single worker enforced |
-| [ ] T3.2 | Integration test for graph: insert one fixture episode with fake model clients against real Neo4j, retrieve, snapshot, remove. Marked `integration`, skipped without `NEO4J_URI` | `backend/tests/test_graph_integration.py` | T2.16, T2.T1 | Passes when Neo4j runs |
+| [x] T3.2 | Integration test for graph: insert one fixture episode with fake model clients against real Neo4j, retrieve, snapshot, remove. Marked `integration`, skipped without `NEO4J_URI` | `backend/tests/test_graph_integration.py` | T2.16, T2.T1 | Passes when Neo4j runs |
 | [x] T3.3 | Compose root: `docker-compose.yml` with `include:` for each fragment, one shared network, named volumes list | `docker-compose.yml` | T1.12 | YAML parses (checked with a YAML parser) |
 | [x] T3.4 | Compose fragment for Neo4j 5 (ports on `127.0.0.1`, data volume, healthcheck) | `compose/neo4j.yml` | T3.3 | YAML parses |
 | [x] T3.5 | Compose fragment for MySQL 8.4 (ports on `127.0.0.1`, data volume, healthcheck with `mysqladmin ping`, database and user from `.env`) | `compose/mysql.yml` | T3.3 | YAML parses |
