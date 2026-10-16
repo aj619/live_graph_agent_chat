@@ -1,0 +1,30 @@
+# Secret scan config for Live Graph Agent Chat (gitleaks format).
+# Runs over the whole repository before every push (PLAN_OF_ACTION.md §9.4).
+# A finding stops the push. Keep the default rules on; the allowlist below only
+# exempts placeholder values in the two committed example env files.
+# The example files are scanned like everything else: a value is exempt only if
+# it matches a placeholder shape AND the file is one of the two examples.
+
+title = "lgac secret scan"
+
+[extend]
+useDefault = true
+
+# Placeholder exemption. Both conditions must hold (condition = "AND"):
+#   1. the finding is in .env.example or .env.test.example (paths), and
+#   2. the matched value is a placeholder shape (regexes).
+# Any other file, and any value that is not a placeholder shape, is still reported.
+[[allowlists]]
+description = "Placeholder values in .env.example and .env.test.example"
+condition = "AND"
+paths = [
+  '''(^|/)\.env\.example$''',
+  '''(^|/)\.env\.test\.example$''',
+]
+regexTarget = "secret"
+regexes = [
+  # Literal placeholders written as changeme-... (generate-with-openssl, -64-hex-chars, -test variants).
+  '''^changeme-[A-Za-z0-9-]+$''',
+  # Local Ollama endpoints ignore the key; the value is the literal word.
+  '''^ollama$''',
+]
