@@ -117,7 +117,7 @@ Note: T2.19 changes the same file as T2.18. It runs after T2.18.
 | [x] T2.T3 | Test logging redaction | `backend/tests/test_logging.py` | T2.2 | Pass |
 | [x] T2.T4 | Test chunking limits and boundaries | `backend/tests/test_chunking.py` | T2.3 | Pass |
 | [x] T2.T5 | Test extraction. The test builds its own sample DOCX with python-docx and a minimal PDF in memory, so no fixture files are needed. Covers bad magic bytes and empty text | `backend/tests/test_extract.py` | T2.4 | Pass |
-| [ ] T2.T6 | Test registry against MySQL: CRUD, tracking rows, the `done` rule, cascade delete. Marked `integration`, skipped without `MYSQL_HOST` | `backend/tests/test_registry.py` | T2.6 | Pass when MySQL is running |
+| [x] T2.T6 | Test registry against MySQL: CRUD, tracking rows, the `done` rule, cascade delete. Marked `integration`, skipped without `MYSQL_HOST` | `backend/tests/test_registry.py` | T2.6 | Pass when MySQL is running |
 | [x] T2.T7 | Test event bus delivery, stalled subscriber drop, keep-alive | `backend/tests/test_events.py` | T2.7 | Pass |
 | [x] T2.T8 | Test rate limiter window | `backend/tests/test_ratelimit.py` | T2.8 | Pass |
 | [x] T2.T9 | Test auth: missing, wrong, correct token; health without token | `backend/tests/test_auth.py` | T2.9 | Pass |
