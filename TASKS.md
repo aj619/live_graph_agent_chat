@@ -40,7 +40,7 @@ Status key: `[ ]` not started, `[x]` done.
 | [x] T1.10 | Create `frontend/eslint.config.js` | `frontend/eslint.config.js` | T1.8 | `npx eslint .` runs |
 | [x] T1.11 | Run the check on `frontend/package-lock.json` (and `npm audit`) and append the result to `SECURITY_CHECK.md` | `SECURITY_CHECK.md` | T1.8, T1.6 | Zero advisories, or each handled |
 | [x] T1.13 | Create `.env.test.example`: the test values from plan §5.9 (separate ports, `*_test` databases, `test_` graph group, test uploads path, `APP_ENV=test`), placeholders only | `.env.test.example` | T1.2 | Every §5.9 rule is reflected; no dev value copied |
-| [ ] T1.14 | Create the secret scan config (gitleaks format) covering the whole repository, including `.env.example` and `.env.test.example` | `.gitleaks.toml` | T1.1 | Config parses; placeholders are not flagged as findings |
+| [x] T1.14 | Create the secret scan config (gitleaks format) covering the whole repository, including `.env.example` and `.env.test.example` | `.gitleaks.toml` | T1.1 | Config parses; placeholders are not flagged as findings |
 | [x] T1.12 | List every container base image tag (Python 3.14, Node, nginx, neo4j 5, mysql 8.4, postgres, clickhouse, redis, minio, langfuse 4) in `SECURITY_CHECK.md`. Pinned tags, no `latest` | `SECURITY_CHECK.md` | T1.7 | Table complete |
 
 ---
@@ -51,7 +51,7 @@ Status key: `[ ]` not started, `[x]` done.
 
 | ID | Task | File | Depends on | Done when |
 |---|---|---|---|---|
-| [ ] T2.1 | `Settings` class with every required variable from plan §5, including `APP_ENV`, MySQL, and `GRAPH_SNAPSHOT_LIMIT`. Required fields have no default. When `APP_ENV=test`, reads only `.env.test`; otherwise reads only `.env`. Never falls back from one file to the other. Exports the loaded file to `os.environ` for the Langfuse SDK | `backend/app/config.py` | T1.5 | Missing required variable raises an error naming it; a test-mode run cannot read a dev value |
+| [x] T2.1 | `Settings` class with every required variable from plan §5, including `APP_ENV`, MySQL, and `GRAPH_SNAPSHOT_LIMIT`. Required fields have no default. When `APP_ENV=test`, reads only `.env.test`; otherwise reads only `.env`. Never falls back from one file to the other. Exports the loaded file to `os.environ` for the Langfuse SDK | `backend/app/config.py` | T1.5 | Missing required variable raises an error naming it; a test-mode run cannot read a dev value |
 | [ ] T2.2 | Logging setup: key=value lines, and a filter that redacts any value equal to a secret from `Settings` | `backend/app/logging_setup.py` | T2.1 | A logged `API_TOKEN` value shows as `***` |
 | [ ] T2.3 | Chunking: split on paragraph boundaries, hard-split oversize paragraphs, never exceed the limit | `backend/app/chunking.py` | T1.5 | Pure function, no I/O |
 | [ ] T2.4 | Text extraction for PDF, TXT, DOCX with magic-byte and parser checks. Raises `UnsupportedDocument`. DOC handling follows T0.1 | `backend/app/extract.py` | T1.5, T0.1 | Each supported type extracts; wrong bytes raise |
