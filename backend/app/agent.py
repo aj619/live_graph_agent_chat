@@ -36,15 +36,21 @@ insensitively. The first one found decides the verdict. A reply with neither
 word counts as NO. A reply with no facts is NO and makes no model call.
 """
 
+import asyncio
 import re
+import uuid
 from collections.abc import Awaitable, Callable
 from typing import Literal, TypedDict
 
 from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
+from sqlalchemy import select
 
 from app.config import Settings, settings
+from app.db import SessionLocal
+from app.events import EventBus
 from app.graph import GraphService, RetrieveResult
+from app.registry import InsertionChunk
 from app.tracing import get_callback_handlers
 
 _VERDICT_PATTERN = re.compile(r"\b(YES|NO)\b", re.IGNORECASE)
@@ -178,3 +184,87 @@ def route_after_grade(state: AgentState) -> Literal["answer", "rewrite"]:
     if state["grounded"] or state["rewrites"] >= settings.AGENT_MAX_REWRITES:
         return "answer"
     return "rewrite"
+
+
+def _doc_ids_for_episodes(episode_uuids: set[uuid.UUID]) -> list[str]:
+    """Return the distinct document IDs (as strings) that own the given episode UUIDs.
+
+    Runs a blocking SQLAlchemy query, so the caller runs it in a worker thread.
+    An empty set returns [] without a query, because an empty IN clause is invalid.
+    """
+    if not episode_uuids:
+        return []
+    stmt = (
+        select(InsertionChunk.doc_id)
+        .where(InsertionChunk.episode_uuid.in_(list(episode_uuids)))
+        .distinct()
+    )
+    with SessionLocal() as session:
+        doc_ids = session.scalars(stmt).all()
+    return sorted({str(doc_id) for doc_id in doc_ids})
+
+
+def _answer_prompt(question: str, facts: list[str]) -> str:
+    """Build the answer prompt. It restricts the model to the supplied facts."""
+    fact_lines = "\n".join(f"- {fact}" for fact in facts) if facts else "(no facts available)"
+    return (
+        "Answer the question using only the facts below. If the facts are not enough "
+        "to answer, say so clearly instead of guessing.\n\n"
+        f"Facts:\n{fact_lines}\n\n"
+        f"Question: {question}"
+    )
+
+
+def make_answer_node(
+    llm: ChatOpenAI, bus: EventBus
+) -> Callable[[AgentState], Awaitable[AgentState]]:
+    """Return the answer node, which publishes the sources and then streams the answer.
+
+    Order is fixed. First it publishes `chat.sources` built from `retrieved`, with
+    the node IDs, edge IDs, facts, node names, and the de-duplicated document IDs
+    that own the episodes behind the edges. Only after that does it stream the
+    model's answer, publishing one `chat.token` per non-empty text chunk. A None
+    `retrieved` is treated as an empty result.
+
+    Args:
+        llm: The agent chat model. Only its async `astream` is used.
+        bus: The event bus that carries the `chat.sources` and `chat.token` events.
+    """
+
+    async def answer(state: AgentState) -> AgentState:
+        retrieved = state["retrieved"] or RetrieveResult()
+        chat_id = state["chat_id"]
+
+        episode_uuids = {
+            uuid.UUID(episode)
+            for episodes in retrieved.episode_uuids_by_edge.values()
+            for episode in episodes
+        }
+        doc_ids = await asyncio.to_thread(_doc_ids_for_episodes, episode_uuids)
+        nodes = [
+            {"id": node_id, "name": retrieved.node_names.get(node_id, "")}
+            for node_id in retrieved.node_ids
+        ]
+        bus.publish(
+            "chat.sources",
+            {
+                "chat_id": chat_id,
+                "node_ids": retrieved.node_ids,
+                "edge_ids": retrieved.edge_ids,
+                "doc_ids": doc_ids,
+                "nodes": nodes,
+                "facts": retrieved.facts,
+            },
+        )
+
+        async for chunk in llm.astream(
+            _answer_prompt(state["question"], retrieved.facts),
+            config={"callbacks": get_callback_handlers()},
+        ):
+            text = chunk.content if isinstance(chunk.content, str) else ""
+            if text:
+                bus.publish("chat.token", {"chat_id": chat_id, "token": text})
+
+        return {**state}
+
+    return answer
