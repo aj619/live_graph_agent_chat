@@ -58,7 +58,7 @@ Status key: `[ ]` not started, `[x]` done.
 | [x] T2.5 | Database engine: SQLAlchemy 2 engine with PyMySQL, `utf8mb4`, pooled connections, session factory built from `Settings` | `backend/app/db.py` | T2.1 | Engine URL built from settings with the password not logged |
 | [x] T2.6 | Registry tables and operations: `documents` and `insertion_chunks` (plan §6.5). Methods: create document, set status and progress, record pending chunk, mark chunk inserted, list documents, list tracked chunks by document, delete document with cascade, count documents. `create_all` at startup | `backend/app/registry.py` | T2.5 | Schema created on first start; methods covered by T2.T6 |
 | [x] T2.7 | Event bus: publish to all subscribers, per-subscriber bounded queue, drop a stalled subscriber without raising, keep-alive comment every 15 s | `backend/app/events.py` | T1.5 | Stream yields connected comment, events, keep-alive |
-| [ ] T2.8 | In-memory rate limiter keyed by API token, used for chat only | `backend/app/ratelimit.py` | T1.5 | Allows N per window, then refuses |
+| [x] T2.8 | In-memory rate limiter keyed by API token, used for chat only | `backend/app/ratelimit.py` | T1.5 | Allows N per window, then refuses |
 | [x] T2.9 | Auth dependency: compare `X-API-Token` to `API_TOKEN` with constant-time compare; 401 otherwise. Health excluded | `backend/app/auth.py` | T2.1 | Wrong or missing token returns 401 |
 | [ ] T2.10 | Tracing helpers: Langfuse `CallbackHandler` when `LANGFUSE_ENABLED=true`, otherwise an empty list. An `observe` wrapper that is a no-op when disabled | `backend/app/tracing.py` | T2.1 | Disabled mode attaches no callbacks |
 
