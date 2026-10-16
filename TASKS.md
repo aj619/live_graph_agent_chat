@@ -71,7 +71,7 @@ Status key: `[ ]` not started, `[x]` done.
 | [x] T2.13 | `GraphService.insert_episode(episode_uuid, name, body, source_description)`: calls `add_episode` with the caller-provided UUID, `group_id` from settings | `backend/app/graph.py` | T2.12 | Episode appears with that UUID (integration, T3.2) |
 | [x] T2.14 | `GraphService.remove_episode(episode_uuid)`: calls Graphiti `remove_episode`; a missing episode is logged and treated as success | `backend/app/graph.py` | T2.12 | Missing UUID does not raise |
 | [x] T2.15 | `GraphService.retrieve`: hybrid search with the cross-encoder recipe, limit from `RETRIEVAL_LIMIT`, group filter. Returns node IDs, edge IDs, facts, and the episode UUIDs of each edge | `backend/app/graph.py` | T2.13 | Returns the IDs described |
-| [ ] T2.16 | `GraphService.snapshot`: Cypher for `Entity` nodes and `RELATES_TO` edges filtered by group, limit from `GRAPH_SNAPSHOT_LIMIT` | `backend/app/graph.py` | T2.12, T2.1 | Returns `{nodes, edges}` with IDs matching retrieve output |
+| [x] T2.16 | `GraphService.snapshot`: Cypher for `Entity` nodes and `RELATES_TO` edges filtered by group, limit from `GRAPH_SNAPSHOT_LIMIT` | `backend/app/graph.py` | T2.12, T2.1 | Returns `{nodes, edges}` with IDs matching retrieve output |
 
 ### 2c. Insertion, recovery, and document rules
 
