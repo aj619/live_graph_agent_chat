@@ -37,12 +37,15 @@ word counts as NO. A reply with no facts is NO and makes no model call.
 """
 
 import asyncio
+import logging
 import re
 import uuid
 from collections.abc import Awaitable, Callable
 from typing import Literal, TypedDict
 
 from langchain_openai import ChatOpenAI
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 from pydantic import SecretStr
 from sqlalchemy import select
 
@@ -53,7 +56,12 @@ from app.graph import GraphService, RetrieveResult
 from app.registry import InsertionChunk
 from app.tracing import get_callback_handlers
 
+logger = logging.getLogger(__name__)
+
 _VERDICT_PATTERN = re.compile(r"\b(YES|NO)\b", re.IGNORECASE)
+
+AGENT_ERROR_MESSAGE = "The assistant could not answer this question."
+"""Generic client-facing text for chat.error. Details go to the logs only."""
 
 
 class AgentState(TypedDict):
@@ -268,3 +276,78 @@ def make_answer_node(
         return {**state}
 
     return answer
+
+
+def _as_graph_node(
+    node: Callable[[AgentState], Awaitable[AgentState]],
+) -> Callable[..., Awaitable[AgentState]]:
+    """Return `node` typed for `StateGraph.add_node`.
+
+    The node factories return `Callable[[AgentState], ...]`. Mypy reads that as
+    positional-only, which LangGraph's node protocol does not accept. The value
+    is returned unchanged, so runtime behaviour is the same.
+    """
+    return node
+
+
+def build_agent_graph(
+    graph: GraphService, llm: ChatOpenAI, bus: EventBus
+) -> CompiledStateGraph[AgentState, None, AgentState, AgentState]:
+    """Build and compile the agent graph for one run (plan §6.8).
+
+    Wiring: START -> retrieve -> grade. grade goes to answer or rewrite by
+    `route_after_grade`. rewrite goes back to retrieve, which is the loop. answer
+    goes to END. The graph is built fresh for each run, so its nodes are bound to
+    this run's `graph`, `llm`, and `bus`.
+
+    Args:
+        graph: The service the retrieve node searches with.
+        llm: The agent chat model used by the grade, rewrite, and answer nodes.
+        bus: The event bus the answer node publishes to.
+    """
+    builder: StateGraph[AgentState, None, AgentState, AgentState] = StateGraph(AgentState)
+    builder.add_node("retrieve", _as_graph_node(make_retrieve_node(graph)))
+    builder.add_node("grade", _as_graph_node(make_grade_node(llm)))
+    builder.add_node("rewrite", _as_graph_node(make_rewrite_node(llm)))
+    builder.add_node("answer", _as_graph_node(make_answer_node(llm, bus)))
+    builder.add_edge(START, "retrieve")
+    builder.add_edge("retrieve", "grade")
+    builder.add_conditional_edges(
+        "grade", route_after_grade, {"answer": "answer", "rewrite": "rewrite"}
+    )
+    builder.add_edge("rewrite", "retrieve")
+    builder.add_edge("answer", END)
+    return builder.compile()
+
+
+async def run(chat_id: str, question: str, graph: GraphService, bus: EventBus) -> None:
+    """Run the agent for one question and publish its outcome on the event bus.
+
+    Meant to be started as a background task, so it never raises. On success it
+    publishes `chat.done`. On any exception it logs the full traceback with
+    `logger.exception`, then publishes `chat.error` with the generic
+    `AGENT_ERROR_MESSAGE`. The exception text never reaches the client.
+
+    Args:
+        chat_id: The chat the question belongs to. Put in every published payload.
+        question: The user's question. It starts both `question` and `query`.
+        graph: The shared graph service the retrieve node searches with.
+        bus: The shared event bus for this process.
+    """
+    try:
+        llm = build_agent_llm()
+        compiled = build_agent_graph(graph, llm, bus)
+        initial_state: AgentState = {
+            "chat_id": chat_id,
+            "question": question,
+            "query": question,
+            "rewrites": 0,
+            "retrieved": None,
+            "grounded": False,
+        }
+        await compiled.ainvoke(initial_state, config={"callbacks": get_callback_handlers()})
+    except Exception:
+        logger.exception("agent run failed for chat %s", chat_id)
+        bus.publish("chat.error", {"chat_id": chat_id, "message": AGENT_ERROR_MESSAGE})
+        return
+    bus.publish("chat.done", {"chat_id": chat_id})
