@@ -421,3 +421,43 @@ None. Every listed npm version has 0 OSV advisories, and `npm audit` reports 0 v
 ### Re-run
 
 Run `python3 -I scripts/check_vulns.py frontend/package-lock.json` from the repo root, then `npm audit` from `frontend/`. Both are read-only.
+
+## Container base image tags (T1.12)
+
+Plan §9.2 record. Lists every base image named in the plan's §8.1 services table, with the tag this project pins. No `latest` is used except where it is named here as a flagged exception.
+
+### Run
+
+- Date: 2026-10-16
+- Method: read-only tag metadata lookups. Docker Hub tag list API (`hub.docker.com/v2/repositories/<repo>/tags`) for the Docker Hub images, and the public Chainguard image directory page (`images.chainguard.dev/directory/image/minio/versions`) for minio. The `cgr.dev` registry tag list returned HTTP 401 without credentials, so it was not used.
+- No image was pulled, run, or scanned. `docker` was not invoked.
+
+### Pinned tags
+
+| Image:tag | Ecosystem / vendor | Used in | Date checked | Notes |
+|---|---|---|---|---|
+| `python:3.14.8-slim-trixie` | Python, Docker official | `backend/Dockerfile` base (T3.1). Candidate only | 2026-10-16 | Candidate, not yet used by a Dockerfile. Python 3.14 per AGENT.md §7. Debian trixie slim. |
+| `node:24.22.0-trixie-slim` | Node.js, Docker official | `frontend/Dockerfile` build stage (Phase 7/8). Candidate only | 2026-10-16 | Candidate, not yet used by a Dockerfile. Node 24 is the Krypton LTS line on Docker Hub (`lts-krypton`). Node 26.12.0 also exists on Hub. The owner decides which line to use. |
+| `nginx:1.30.6-alpine3.24` | nginx, Docker official | `frontend/Dockerfile` runtime stage (Phase 7/8). Candidate only | 2026-10-16 | Candidate, not yet used by a Dockerfile. nginx stable branch. |
+| `neo4j:5.26.32-community` | Neo4j, Docker official | `neo4j` service (plan §8.1) | 2026-10-16 | Plan names `neo4j:5`. This is the newest 5.x patch on Hub at check time, community edition. |
+| `mysql:8.4.11` | Oracle, Docker official | `mysql` service (plan §8.1) | 2026-10-16 | Plan names `mysql:8.4` (LTS). Exact patch pinned. |
+| `postgres:17.11` | PostgreSQL, Docker official | `postgres` service, Langfuse database (plan §8.1) | 2026-10-16 | Plan names `postgres:${POSTGRES_VERSION}` with 17. The value of `POSTGRES_VERSION` should be `17.11` (driver or owner sets it in `.env`). |
+| `clickhouse/clickhouse-server:25.12.11.4` | ClickHouse Inc. | `clickhouse` service, Langfuse (plan §8.1) | 2026-10-16 | Plan names the 25.12 upstream Langfuse tag. This is the newest 25.12 patch on Hub at check time. Default Debian-based variant, not `-alpine` or `-distroless`. |
+| `redis:7.4.11` | Redis, Docker official | `redis` service, Langfuse (plan §8.1) | 2026-10-16 | Plan names `redis:7`. This is the newest 7.x patch on Hub at check time. An 8.x line also exists. The plan says 7, so no change was made. |
+| `cgr.dev/chainguard/minio:0.20260922.192518` | Chainguard | `minio` service, Langfuse S3 storage (plan §8.1) | 2026-10-16 | **FLAGGED EXCEPTION.** The plan names `cgr.dev/chainguard/minio` with no tag. Chainguard's public directory lists only the rolling tags `latest` and `latest-dev`, plus date-stamped version tags. This row uses the newest listed date-stamped tag so the image is not `latest`. The `cgr.dev` tag list needs credentials, so this exact tag was not confirmed on the registry. The driver or owner must confirm the tag and the upstream Langfuse choice. |
+| `docker.langfuse.com/langfuse/langfuse:4` | Langfuse | `langfuse-web` (plan §8.1) | 2026-10-16 | Transcribed as the plan gives it. This is a major-only tag, not an exact patch tag. Re-checking the exact patch is a later task. Docker Hub mirror shows `4.59.0` as the newest 4.x at check time. |
+| `docker.langfuse.com/langfuse/langfuse-worker:4` | Langfuse | `langfuse-worker` (plan §8.1) | 2026-10-16 | Same as the row above. Transcribed as given. Docker Hub mirror shows `4.59.0` as the newest 4.x at check time. |
+
+### Vulnerability status
+
+- No image-level vulnerability scan was run. No scanner is installed in this environment (`trivy` and `docker scout` are absent), and `docker` is not run by agents (AGENT.md §4).
+- OSV (`https://api.osv.dev/v1/query`) does not hold records keyed to these container tags, so this table makes no vulnerability claim.
+- The tags above are listed so the owner, or a future CI step, can scan them. Every tag in this table must be scanned before the first `docker compose up` on a new host.
+
+### Findings
+
+None recorded. The table is a list of tags only. No scan result was produced.
+
+### Re-run
+
+Repeat the tag lookups above (Docker Hub tag API, Chainguard directory page) and compare against the table. Update this section with a new run section when a tag changes. Do not overwrite the earlier run.
