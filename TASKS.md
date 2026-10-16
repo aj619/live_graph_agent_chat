@@ -52,7 +52,7 @@ Status key: `[ ]` not started, `[x]` done.
 | ID | Task | File | Depends on | Done when |
 |---|---|---|---|---|
 | [x] T2.1 | `Settings` class with every required variable from plan §5, including `APP_ENV`, MySQL, and `GRAPH_SNAPSHOT_LIMIT`. Required fields have no default. When `APP_ENV=test`, reads only `.env.test`; otherwise reads only `.env`. Never falls back from one file to the other. Exports the loaded file to `os.environ` for the Langfuse SDK | `backend/app/config.py` | T1.5 | Missing required variable raises an error naming it; a test-mode run cannot read a dev value |
-| [ ] T2.2 | Logging setup: key=value lines, and a filter that redacts any value equal to a secret from `Settings` | `backend/app/logging_setup.py` | T2.1 | A logged `API_TOKEN` value shows as `***` |
+| [x] T2.2 | Logging setup: key=value lines, and a filter that redacts any value equal to a secret from `Settings` | `backend/app/logging_setup.py` | T2.1 | A logged `API_TOKEN` value shows as `***` |
 | [ ] T2.3 | Chunking: split on paragraph boundaries, hard-split oversize paragraphs, never exceed the limit | `backend/app/chunking.py` | T1.5 | Pure function, no I/O |
 | [ ] T2.4 | Text extraction for PDF, TXT, DOCX with magic-byte and parser checks. Raises `UnsupportedDocument`. DOC handling follows T0.1 | `backend/app/extract.py` | T1.5, T0.1 | Each supported type extracts; wrong bytes raise |
 | [x] T2.5 | Database engine: SQLAlchemy 2 engine with PyMySQL, `utf8mb4`, pooled connections, session factory built from `Settings` | `backend/app/db.py` | T2.1 | Engine URL built from settings with the password not logged |
