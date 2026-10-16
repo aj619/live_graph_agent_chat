@@ -45,6 +45,36 @@ class RetrieveResult:
     episode_uuids_by_edge: dict[str, list[str]] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class SnapshotNode:
+    """One Entity node in the graph snapshot. `id` is the node UUID used by retrieve()."""
+
+    id: str
+    name: str
+
+
+@dataclass(frozen=True)
+class SnapshotEdge:
+    """One RELATES_TO edge in the graph snapshot. `id` is the edge UUID used by retrieve().
+
+    `source_id` and `target_id` are the UUIDs of the Entity nodes at each end.
+    """
+
+    id: str
+    name: str
+    fact: str
+    source_id: str
+    target_id: str
+
+
+@dataclass(frozen=True)
+class GraphSnapshot:
+    """The nodes and edges of this service's group, each list capped at GRAPH_SNAPSHOT_LIMIT."""
+
+    nodes: list[SnapshotNode] = field(default_factory=list)
+    edges: list[SnapshotEdge] = field(default_factory=list)
+
+
 class GraphService:
     """Holds the Neo4j driver and the Graphiti client for the process lifetime."""
 
@@ -76,6 +106,7 @@ class GraphService:
         )
         self._group_id = cfg.GRAPH_GROUP_ID
         self._retrieval_limit = cfg.RETRIEVAL_LIMIT
+        self._snapshot_limit = cfg.GRAPH_SNAPSHOT_LIMIT
 
     async def start(self) -> None:
         """Create the Neo4j indices and constraints. Needs a reachable Neo4j."""
@@ -169,4 +200,48 @@ class GraphService:
             edge_ids=[edge.uuid for edge in results.edges],
             facts=[edge.fact for edge in results.edges],
             episode_uuids_by_edge={edge.uuid: list(edge.episodes) for edge in results.edges},
+        )
+
+    async def snapshot(self) -> GraphSnapshot:
+        """Return the Entity nodes and RELATES_TO edges of this service's group.
+
+        Two Cypher queries run, one for nodes and one for edges. Each is capped by
+        its own LIMIT set from `GRAPH_SNAPSHOT_LIMIT`, so the lists are independent.
+        An edge can therefore name a source or target that is missing from the
+        truncated node list. The IDs are the same UUIDs that retrieve() returns.
+
+        Returns:
+            The node IDs and names, and the edge IDs, names, facts, and endpoint IDs.
+        """
+        node_records, _, _ = await self.driver.execute_query(
+            """
+            MATCH (n:Entity {group_id: $group_id})
+            RETURN n.uuid AS uuid, n.name AS name
+            LIMIT $limit
+            """,
+            group_id=self._group_id,
+            limit=self._snapshot_limit,
+        )
+        edge_records, _, _ = await self.driver.execute_query(
+            """
+            MATCH (n:Entity)-[e:RELATES_TO {group_id: $group_id}]->(m:Entity)
+            RETURN e.uuid AS uuid, e.name AS name, e.fact AS fact,
+                   n.uuid AS source_id, m.uuid AS target_id
+            LIMIT $limit
+            """,
+            group_id=self._group_id,
+            limit=self._snapshot_limit,
+        )
+        return GraphSnapshot(
+            nodes=[SnapshotNode(id=record["uuid"], name=record["name"]) for record in node_records],
+            edges=[
+                SnapshotEdge(
+                    id=record["uuid"],
+                    name=record["name"],
+                    fact=record["fact"],
+                    source_id=record["source_id"],
+                    target_id=record["target_id"],
+                )
+                for record in edge_records
+            ],
         )
