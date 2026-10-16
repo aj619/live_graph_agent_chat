@@ -1,0 +1,36 @@
+# Backend service fragment. Included from the root docker-compose.yml.
+# Build context is the repository root (backend/Dockerfile COPY paths start at backend/).
+# Runtime env comes from .env at container start via env_file. Nothing is baked into the image.
+# Network `lgac` and volume `lgac_backend_data` are declared in the root file.
+#
+# Known gap: the host port is hard-coded to 8000 because no BACKEND_PORT variable exists
+# in .env.example or .env.test.example. The backend runs only in the dev stack (plan §8.2
+# test stack does not start it), so this does not collide with the test stack.
+#
+# Uploads: DATA_DIR=uploads is relative to WORKDIR /app, so the app writes to
+# /app/uploads/uploads (main.py and routes_documents.py both join "uploads" onto DATA_DIR).
+# The volume is mounted at /app/uploads, which covers that path.
+
+services:
+  backend:
+    build:
+      # Relative to this file (compose/), so this is the repository root.
+      context: ..
+      dockerfile: backend/Dockerfile
+    # No explicit container_name: Compose's <project>-<service>-<index> naming
+    # keeps dev (lgac) and test (lgac-test) containers apart.
+    restart: unless-stopped
+    env_file:
+      # Relative to this file (compose/), so this is the .env at the repository root.
+      - ../.env
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - lgac_backend_data:/app/uploads
+    networks:
+      - lgac
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
