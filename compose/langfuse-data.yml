@@ -1,0 +1,102 @@
+# Langfuse's data services: postgres, clickhouse, redis, minio.
+# Included by the root docker-compose.yml. All four carry `profiles: [langfuse]`,
+# so a bare `docker compose up` skips them entirely — Langfuse tracing is
+# optional (plan D25; `app/tracing.py` already no-ops every call when
+# LANGFUSE_ENABLED is false). Start them only with:
+#   docker compose --profile langfuse up -d
+#
+# Environment variable names and healthchecks are taken from the upstream
+# Langfuse docker-compose.yml (langfuse/langfuse on GitHub), adapted to this
+# project's naming (already matches upstream) and port rule: every service
+# here publishes to 127.0.0.1 only (plan §8.1 — only the frontend and
+# langfuse-web are reachable beyond localhost).
+
+services:
+  postgres:
+    image: postgres:17.11
+    profiles: ["langfuse"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - lgac_postgres_data:/var/lib/postgresql/data
+    networks:
+      - lgac
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.12.11.4
+    profiles: ["langfuse"]
+    restart: unless-stopped
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+    ports:
+      - "127.0.0.1:8123:8123"   # HTTP, used by the healthcheck and CLICKHOUSE_URL
+      - "127.0.0.1:9000:9000"   # native protocol, used by CLICKHOUSE_MIGRATION_URL
+    volumes:
+      - lgac_clickhouse_data:/var/lib/clickhouse
+    networks:
+      - lgac
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7.4.11
+    profiles: ["langfuse"]
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_AUTH}", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    networks:
+      - lgac
+    healthcheck:
+      # Upstream's own healthcheck is a bare `redis-cli ping`, which fails
+      # once --requirepass is actually enforced (NOAUTH error). This project
+      # always sets REDIS_AUTH, so the healthcheck authenticates.
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_AUTH}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  minio:
+    image: cgr.dev/chainguard/minio:0.20260922.192518
+    profiles: ["langfuse"]
+    restart: unless-stopped
+    entrypoint: sh
+    # Creates the `langfuse` bucket (a directory under /data) before serving.
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "127.0.0.1:9000:9000"   # S3 API
+      - "127.0.0.1:9001:9001"   # console UI
+    volumes:
+      - lgac_minio_data:/data
+    networks:
+      - lgac
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s

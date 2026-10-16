@@ -48,6 +48,8 @@ A portfolio web app. The user uploads documents (PDF, TXT, DOCX). Each document 
 
 Anthropic note for D24: Anthropic has no embeddings API, and Graphiti's structured-output calls need `OpenAIGenericClient` (schema injected into the prompt) rather than the plain `OpenAIClient`, for any non-OpenAI OpenAI-compatible endpoint.
 
+| D25 | Langfuse is optional (added 2026-10-17 by owner decision) | Tracing was already gated behind `LANGFUSE_ENABLED` in code (`app/tracing.py` no-ops every call when it is false). This decision extends that to the infrastructure: `postgres`, `clickhouse`, `redis`, `minio`, `langfuse-web`, and `langfuse-worker` all carry `profiles: [langfuse]` in their compose fragments, so a bare `docker compose up` never starts them. `LANGFUSE_ENABLED=false` is now the default in both `.env.example` and `.env.test.example`. Turning tracing on requires both setting it to `true` and starting the profile explicitly: `docker compose --profile langfuse up -d` |
+
 ---
 
 ## 3. Scope
@@ -482,17 +484,18 @@ The sub-agent writes these files, plus `backend/Dockerfile`, `frontend/Dockerfil
 |---|---|---|
 | `neo4j` | `neo4j:5` | Ports bound to `127.0.0.1` only. Data volume |
 | `mysql` | `mysql:8.4` (LTS) | Ports bound to `127.0.0.1`. Data volume. Healthcheck with `mysqladmin ping`. Creates `MYSQL_DATABASE` and `MYSQL_USER` on first start |
-| `postgres` | `postgres:${POSTGRES_VERSION}` (17 in upstream Langfuse) | Langfuse database. Healthcheck `pg_isready` |
-| `clickhouse` | `clickhouse/clickhouse-server:25.12` (upstream Langfuse tag) | Healthcheck on `/ping`. Ports bound to localhost |
-| `redis` | `redis:7` | `--requirepass ${REDIS_AUTH}`. Ports bound to localhost |
-| `minio` | `cgr.dev/chainguard/minio` (upstream Langfuse image) | Healthcheck `mc ready local`. Creates the `langfuse` bucket at start |
-| `langfuse-web` | `docker.langfuse.com/langfuse/langfuse:4` (upstream image host) | Port 3000 published. Depends on all data services being healthy |
-| `langfuse-worker` | `docker.langfuse.com/langfuse/langfuse-worker:4` | Same env as web. Port 3030 bound to localhost |
+| `postgres` | `postgres:${POSTGRES_VERSION}` (17 in upstream Langfuse) | Langfuse database. Healthcheck `pg_isready`. **Optional (D25)** — `profiles: [langfuse]` |
+| `clickhouse` | `clickhouse/clickhouse-server:25.12` (upstream Langfuse tag) | Healthcheck on `/ping`. Ports bound to localhost. **Optional (D25)** — `profiles: [langfuse]` |
+| `redis` | `redis:7` | `--requirepass ${REDIS_AUTH}`. Ports bound to localhost. **Optional (D25)** — `profiles: [langfuse]` |
+| `minio` | `cgr.dev/chainguard/minio` (upstream Langfuse image) | Healthcheck `mc ready local`. Creates the `langfuse` bucket at start. **Optional (D25)** — `profiles: [langfuse]` |
+| `langfuse-web` | `docker.langfuse.com/langfuse/langfuse:4` (upstream image host) | Port 3000 published. Depends on all data services being healthy. **Optional (D25)** — `profiles: [langfuse]` |
+| `langfuse-worker` | `docker.langfuse.com/langfuse/langfuse-worker:4` | Same env as web. Port 3030 bound to localhost. **Optional (D25)** — `profiles: [langfuse]` |
 | `backend` | Built from `backend/Dockerfile` | Port 8000 bound to localhost. Reads `.env`. Depends on Neo4j and MySQL healthy |
 | `frontend` | Built from `frontend/Dockerfile` (multi-stage: Node build, then nginx) | Port 5173 mapped to nginx port 8080. Injects `API_TOKEN` into nginx template |
 
 Notes for the implementer:
 - Use the upstream Langfuse compose file (`langfuse/langfuse` on GitHub, `docker-compose.yml`) as the reference for the Langfuse block. Copy its environment variable names and healthchecks. Re-check tags at implementation time.
+- All six Langfuse services (`postgres`, `clickhouse`, `redis`, `minio`, `langfuse-web`, `langfuse-worker`) carry `profiles: [langfuse]` and are skipped by a bare `docker compose up` (D25). They start only with `docker compose --profile langfuse up -d`.
 - All host ports bound to `127.0.0.1` except the frontend and Langfuse web UI.
 - Every published port and container name is read from `.env` (or `.env.test` for the test stack), so the two stacks can run at the same time (section 5.9).
 - Named volumes for every stateful service.
@@ -511,26 +514,37 @@ cp .env.example .env
 openssl rand -hex 32   # use for API_TOKEN, SALT, ENCRYPTION_KEY, NEXTAUTH_SECRET, passwords as needed
 
 # 2. Start infrastructure first
-docker compose up -d neo4j mysql postgres clickhouse redis minio langfuse-web langfuse-worker
+docker compose up -d neo4j mysql
 
-# 3. Open Langfuse at http://localhost:3000, create a project,
-#    copy its public and secret keys into .env (LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY)
-
-# 4. Start the app
+# 3. Start the app
 docker compose up -d --build backend frontend
 
-# 5. Check status
+# 4. Check status
 docker compose ps
 docker compose logs -f backend
 
-# 6. Open the app
+# 5. Open the app
 #    http://localhost:8080
+```
+
+Langfuse tracing is optional (D25) and off by default (`LANGFUSE_ENABLED=false`). To turn it on:
+```bash
+# 1. Start the Langfuse data and app services (the --profile flag is required;
+#    they are skipped by every command above)
+docker compose --profile langfuse up -d postgres clickhouse redis minio langfuse-web langfuse-worker
+
+# 2. Open Langfuse at http://localhost:3000, create a project,
+#    copy its public and secret keys into .env (LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY)
+
+# 3. Set LANGFUSE_ENABLED=true in .env, then restart the backend
+docker compose up -d --build backend
 ```
 
 Test stack (separate project, separate data, never shares volumes with dev):
 ```bash
-# start the test stack with test settings
-docker compose -p lgac-test --env-file .env.test up -d neo4j mysql postgres clickhouse redis minio langfuse-web langfuse-worker
+# start the test stack with test settings (add --profile langfuse ... and the
+# six Langfuse services if you also want tracing on the test stack)
+docker compose -p lgac-test --env-file .env.test up -d neo4j mysql
 
 # run the integration suite from the backend folder, against the test stack only
 APP_ENV=test uv run --env-file ../.env.test pytest -m integration
