@@ -17,13 +17,21 @@ IDs and counts only, never filenames or text.
 
 import logging
 import uuid
+from pathlib import Path
 from typing import Final
 
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.db import SessionLocal
 from app.graph import GraphService
-from app.registry import list_documents, list_tracked_chunks, set_document_status
+from app.registry import (
+    Document,
+    delete_document,
+    list_documents,
+    list_tracked_chunks,
+    set_document_status,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -69,3 +77,46 @@ async def run_startup_recovery(graph: GraphService) -> int:
             )
             recovered += 1
     return recovered
+
+
+async def delete_document_everywhere(graph: GraphService, doc_id: uuid.UUID) -> bool:
+    """Delete one document from the graph, the registry, and the upload store.
+
+    This is the removal path the DELETE document API route uses. It runs in
+    crash-safety order:
+
+    1. Remove every tracked episode of the document from the graph.
+    2. Delete the document row. The ORM cascade removes its insertion_chunks rows.
+    3. Delete the stored file last.
+
+    Args:
+        graph: The GraphService used to remove episodes from the graph.
+        doc_id: The ID of the document to delete.
+
+    Returns:
+        True when the document existed and was deleted. False when no such
+        document exists, in which case nothing is touched.
+    """
+    with SessionLocal() as session:
+        doc = session.get(Document, doc_id)
+        if doc is None:
+            return False
+        stored_name = doc.stored_name
+        chunks = list_tracked_chunks(session, doc_id)
+        for chunk in chunks:
+            await graph.remove_episode(str(chunk.episode_uuid))
+        delete_document(session, doc_id)
+        episode_count = len(chunks)
+
+    stored_path = Path(settings.DATA_DIR) / "uploads" / stored_name
+    try:
+        stored_path.unlink()
+    except FileNotFoundError:
+        logger.warning("stored file for document %s was already missing", doc_id)
+
+    logger.info(
+        "deleted document %s: removed %d tracked episodes and their rows",
+        doc_id,
+        episode_count,
+    )
+    return True
