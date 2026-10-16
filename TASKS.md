@@ -104,7 +104,7 @@ Note: T2.19 changes the same file as T2.18. It runs after T2.18.
 | [ ] T2.29 | App factory and lifespan: create `DATA_DIR/uploads`, create the database engine and tables, start the graph service, **run startup recovery before serving**, stop the graph service on shutdown, register routers, CORS from `CORS_ORIGINS`, global exception handler returning a generic 500 and logging the traceback, logging setup | `backend/app/main.py` | T2.24 to T2.28, T2.2, T2.18 | `uvicorn app.main:app` starts with a valid `.env` and fails clearly without one |
 | [ ] T2.30 | Security headers middleware for API responses: `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` | `backend/app/security_headers.py` | T2.1 | Headers present on every response |
 | [ ] T2.31 | Wire the security headers middleware into the app factory | `backend/app/main.py` | T2.29, T2.30 | Test T2.T16 passes |
-| [ ] T2.32 | Package marker | `backend/app/__init__.py` | T1.5 | File exists |
+| [x] T2.32 | Package marker | `backend/app/__init__.py` | T1.5 | File exists |
 
 ---
 
