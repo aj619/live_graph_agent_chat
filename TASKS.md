@@ -144,7 +144,7 @@ Note: T2.19 changes the same file as T2.18. It runs after T2.18.
 | [x] T3.3 | Compose root: `docker-compose.yml` with `include:` for each fragment, one shared network, named volumes list | `docker-compose.yml` | T1.12 | YAML parses (checked with a YAML parser) |
 | [x] T3.4 | Compose fragment for Neo4j 5 (ports on `127.0.0.1`, data volume, healthcheck) | `compose/neo4j.yml` | T3.3 | YAML parses |
 | [x] T3.5 | Compose fragment for MySQL 8.4 (ports on `127.0.0.1`, data volume, healthcheck with `mysqladmin ping`, database and user from `.env`) | `compose/mysql.yml` | T3.3 | YAML parses |
-| [ ] T3.5b | Compose fragment for Ollama (D24 default provider): pinned `ollama/ollama` tag, ports on `127.0.0.1`, data volume for pulled models, healthcheck | `compose/ollama.yml` | T3.3 | YAML parses |
+| [x] T3.5b | ~~Compose fragment for Ollama~~ — **REMOVED by owner decision (2026-10-16).** `ollama/ollama`'s OSV check found 9 open Go-ecosystem advisories with no fixed version across every checked tag (0.33.3, 0.35.1, 0.40.4, 0.40.5); the owner chose not to accept the risk and instead supplies LLM/embedding/agent-LLM endpoints directly in `.env` (no default provider — see D24). No `compose/ollama.yml` exists. `docker-compose.yml`'s `include:`/`volumes:` and `.env.example`/`.env.test.example` were updated to remove Ollama and leave `changeme-...` placeholders for the owner to fill in | `compose/ollama.yml` (not created) | T3.3 | N/A — task superseded by owner decision, not built |
 | [ ] T3.6 | Compose fragment for Langfuse data services: postgres, clickhouse, redis, minio, with healthchecks and localhost-only ports | `compose/langfuse-data.yml` | T3.3 | YAML parses |
 | [ ] T3.7 | Compose fragment for Langfuse app services: `langfuse-web` (port 3000) and `langfuse-worker` | `compose/langfuse-app.yml` | T3.6 | YAML parses; env names match upstream |
 | [x] T3.8 | Compose fragment for the backend: build from T3.1, `env_file: .env`, `DATA_DIR` volume, depends on Neo4j and MySQL healthy, localhost port 8000 | `compose/backend.yml` | T3.1, T3.4, T3.5 | YAML parses |
@@ -320,7 +320,7 @@ Checked against the revised plan. Gaps found and fixed:
 
 Resolved, carried into the plan as decisions (no longer open):
 - **O2 → D23 (`.doc` support)**: DOCX only. T2.4 extracts PDF/TXT/DOCX and raises on anything else; no DOC branch.
-- **O3 → D24 (provider endpoints and keys)**: self-hosted Ollama is the `.env.example` default (T1.2), with an `ollama` compose service (T3.5b). The owner can still override to a hosted provider in their own `.env`; T0.2 (copying `.env.example` to `.env`) is still an owner action.
+- **O3 → D24 (provider endpoints and keys)**: no default provider (revised 2026-10-16 — self-hosted Ollama was removed, see D24 and T3.5b). `.env.example` ships `changeme-...` placeholders for `LLM_*`/`EMBEDDING_*`/`AGENT_LLM_*`; the owner fills in their own OpenAI-compatible provider. T0.2 (copying `.env.example` to `.env`) is still an owner action.
 
 Still open, not solved by tasks:
 - **Embedding dimension** is fixed by Graphiti. Changing the embedding model needs a fresh Neo4j volume. Listed as a limitation in T10.4.

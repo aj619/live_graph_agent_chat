@@ -8,7 +8,6 @@ name: lgac
 include:
   - compose/neo4j.yml
   - compose/mysql.yml
-  - compose/ollama.yml
   - compose/langfuse-data.yml
   - compose/langfuse-app.yml
   - compose/backend.yml
@@ -21,7 +20,6 @@ networks:
 volumes:
   lgac_neo4j_data: {}
   lgac_mysql_data: {}
-  lgac_ollama_data: {}
   lgac_postgres_data: {}
   lgac_clickhouse_data: {}
   lgac_minio_data: {}
