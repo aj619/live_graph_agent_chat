@@ -127,7 +127,7 @@ Note: T2.19 changes the same file as T2.18. It runs after T2.18.
 | [ ] T2.T13 | Test agent: `chat.sources` before first token; rewrite loop stops at `AGENT_MAX_REWRITES`; failure publishes `chat.error` | `backend/tests/test_agent.py` | T2.23, T2.T1 | Pass |
 | [ ] T2.T14 | Test document routes: each validation step and status code | `backend/tests/test_routes_documents.py` | T2.25, T2.T1 | Pass |
 | [ ] T2.T15 | Test system, graph, and chat routes | `backend/tests/test_routes_other.py` | T2.24, T2.26, T2.27, T2.T1 | Pass |
-| [ ] T2.T16 | Test security headers on API responses | `backend/tests/test_security_headers.py` | T2.31 | Pass |
+| [x] T2.T16 | Test security headers on API responses | `backend/tests/test_security_headers.py` | T2.31 | Pass |
 | [ ] T2.T17 | Test SSE route yields events in order over an async client | `backend/tests/test_routes_events.py` | T2.28, T2.T1 | Pass |
 | [ ] T2.T18 | Test app startup: missing variable fails, valid settings create `DATA_DIR/uploads`, recovery runs before the first request | `backend/tests/test_main.py` | T2.29 | Pass |
 | [ ] T2.T19 | Test the global exception handler returns a generic 500 without a traceback | `backend/tests/test_main_errors.py` | T2.29 | Pass |
