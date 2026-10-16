@@ -294,8 +294,8 @@ These are not built by a worker. The driver assigns them when the phase's builda
 
 | ID | Check | Agent | Scope | Depends on | Done when |
 |---|---|---|---|---|---|
-| [ ] C2.1 | Backend coverage check against plan §10.1 and §13 | test-author | `backend/tests/` and `backend/app/` | all Phase 2 tasks merged | Use-case table written to the run file, with no silent gaps |
-| [ ] C2.2 | Security review of the backend core | security-reviewer | `backend/app/` | all Phase 2 tasks merged | Findings written to the run file |
+| [x] C2.1 | Backend coverage check against plan §10.1 and §13 | test-author | `backend/tests/` and `backend/app/` | all Phase 2 tasks merged | Use-case table written to the run file, with no silent gaps |
+| [x] C2.2 | Security review of the backend core | security-reviewer | `backend/app/` | all Phase 2 tasks merged | Findings written to the run file |
 | [ ] C7.1 | Frontend coverage check against plan §10.2 | test-author | `frontend/tests/` and `frontend/src/` | all Phase 7 tasks merged | Use-case table written to the run file |
 | [ ] C7.2 | Security review of the frontend | security-reviewer | `frontend/` | all Phase 7 tasks merged | Findings written to the run file |
 | [ ] C8.1 | Security review of container and proxy config | security-reviewer | `compose/`, `frontend/nginx.conf.template`, `frontend/Dockerfile`, `backend/Dockerfile` | Phase 8 tasks merged | Findings written to the run file |
