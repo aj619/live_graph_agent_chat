@@ -120,7 +120,7 @@ Note: T2.19 changes the same file as T2.18. It runs after T2.18.
 | [ ] T2.T6 | Test registry against MySQL: CRUD, tracking rows, the `done` rule, cascade delete. Marked `integration`, skipped without `MYSQL_HOST` | `backend/tests/test_registry.py` | T2.6 | Pass when MySQL is running |
 | [x] T2.T7 | Test event bus delivery, stalled subscriber drop, keep-alive | `backend/tests/test_events.py` | T2.7 | Pass |
 | [ ] T2.T8 | Test rate limiter window | `backend/tests/test_ratelimit.py` | T2.8 | Pass |
-| [ ] T2.T9 | Test auth: missing, wrong, correct token; health without token | `backend/tests/test_auth.py` | T2.9 | Pass |
+| [x] T2.T9 | Test auth: missing, wrong, correct token; health without token | `backend/tests/test_auth.py` | T2.9 | Pass |
 | [ ] T2.T10 | Test insert service: success path; failure on chunk 3 of 5 keeps chunks 1 and 2 tracked; `UnsupportedDocument` not retried; retries stop at `INGEST_RETRIES` | `backend/tests/test_insert.py` | T2.17, T2.T1 | Pass |
 | [ ] T2.T11 | Test recovery: a `processing` document with one `pending` and two `inserted` rows is cleaned (three removals, rows gone, status `interrupted`); second run safe; missing episode skipped | `backend/tests/test_recovery.py` | T2.18, T2.T1 | Pass |
 | [ ] T2.T12 | Test deletion path: episodes removed, rows gone, file gone | `backend/tests/test_delete.py` | T2.19, T2.T1 | Pass |
