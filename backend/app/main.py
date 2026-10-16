@@ -39,6 +39,7 @@ from app.routes_documents import router as documents_router
 from app.routes_events import router as events_router
 from app.routes_graph import router as graph_router
 from app.routes_system import router as system_router
+from app.security_headers import SecurityHeadersMiddleware
 
 configure_logging()
 
@@ -75,6 +76,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Added after CORS so it wraps CORS: every response, including CORS replies, gets the headers.
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.include_router(system_router)
 app.include_router(documents_router)
