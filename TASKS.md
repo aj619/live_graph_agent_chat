@@ -67,7 +67,7 @@ Status key: `[ ]` not started, `[x]` done.
 | ID | Task | File | Depends on | Done when |
 |---|---|---|---|---|
 | [x] T2.11 | Model client factory: Graphiti's LLM client, embedder, and reranker built from `Settings`, all through OpenAI-compatible base URLs. Accepts an injected override for tests | `backend/app/models.py` | T2.1 | Returns three clients; no provider name in code |
-| [ ] T2.12 | `GraphService` lifecycle: construct Graphiti with `Neo4jDriver(database=...)`, `build_indices_and_constraints()` on start, `close()` on stop | `backend/app/graph.py` | T2.11 | Start and close run against a live Neo4j (T3.2) |
+| [x] T2.12 | `GraphService` lifecycle: construct Graphiti with `Neo4jDriver(database=...)`, `build_indices_and_constraints()` on start, `close()` on stop | `backend/app/graph.py` | T2.11 | Start and close run against a live Neo4j (T3.2) |
 | [ ] T2.13 | `GraphService.insert_episode(episode_uuid, name, body, source_description)`: calls `add_episode` with the caller-provided UUID, `group_id` from settings | `backend/app/graph.py` | T2.12 | Episode appears with that UUID (integration, T3.2) |
 | [ ] T2.14 | `GraphService.remove_episode(episode_uuid)`: calls Graphiti `remove_episode`; a missing episode is logged and treated as success | `backend/app/graph.py` | T2.12 | Missing UUID does not raise |
 | [ ] T2.15 | `GraphService.retrieve`: hybrid search with the cross-encoder recipe, limit from `RETRIEVAL_LIMIT`, group filter. Returns node IDs, edge IDs, facts, and the episode UUIDs of each edge | `backend/app/graph.py` | T2.13 | Returns the IDs described |
