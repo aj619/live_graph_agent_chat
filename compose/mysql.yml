@@ -1,0 +1,26 @@
+# MySQL 8.4 service fragment. Included from the root docker-compose.yml.
+# Ports, database, and user come from .env (or .env.test with -p lgac-test).
+# No container_name: Compose namespaces container names per project, so the
+# dev and test stacks can run at the same time.
+
+services:
+  mysql:
+    image: mysql:8.4.11
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "127.0.0.1:${MYSQL_PORT}:3306"
+    volumes:
+      - lgac_mysql_data:/var/lib/mysql
+    networks:
+      - lgac
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
