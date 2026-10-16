@@ -36,13 +36,15 @@ class RetrieveResult:
 
     `facts` and `edge_ids` are parallel lists. `episode_uuids_by_edge` maps each
     edge UUID to the UUIDs of the episodes that reference it. Mapping those
-    episode UUIDs to document IDs is left to the caller.
+    episode UUIDs to document IDs is left to the caller. `node_names` maps each
+    node UUID in `node_ids` to its display name.
     """
 
     node_ids: list[str] = field(default_factory=list)
     edge_ids: list[str] = field(default_factory=list)
     facts: list[str] = field(default_factory=list)
     episode_uuids_by_edge: dict[str, list[str]] = field(default_factory=dict)
+    node_names: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -200,6 +202,7 @@ class GraphService:
             edge_ids=[edge.uuid for edge in results.edges],
             facts=[edge.fact for edge in results.edges],
             episode_uuids_by_edge={edge.uuid: list(edge.episodes) for edge in results.edges},
+            node_names={node.uuid: node.name for node in results.nodes},
         )
 
     async def snapshot(self) -> GraphSnapshot:
