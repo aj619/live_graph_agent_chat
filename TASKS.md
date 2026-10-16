@@ -125,7 +125,7 @@ Note: T2.19 changes the same file as T2.18. It runs after T2.18.
 | [x] T2.T11 | Test recovery: a `processing` document with one `pending` and two `inserted` rows is cleaned (three removals, rows gone, status `interrupted`); second run safe; missing episode skipped | `backend/tests/test_recovery.py` | T2.18, T2.T1 | Pass |
 | [x] T2.T12 | Test deletion path: episodes removed, rows gone, file gone | `backend/tests/test_delete.py` | T2.19, T2.T1 | Pass |
 | [x] T2.T13 | Test agent: `chat.sources` before first token; rewrite loop stops at `AGENT_MAX_REWRITES`; failure publishes `chat.error` | `backend/tests/test_agent.py` | T2.23, T2.T1 | Pass |
-| [ ] T2.T14 | Test document routes: each validation step and status code | `backend/tests/test_routes_documents.py` | T2.25, T2.T1 | Pass |
+| [x] T2.T14 | Test document routes: each validation step and status code | `backend/tests/test_routes_documents.py` | T2.25, T2.T1 | Pass |
 | [x] T2.T15 | Test system, graph, and chat routes | `backend/tests/test_routes_other.py` | T2.24, T2.26, T2.27, T2.T1 | Pass |
 | [x] T2.T16 | Test security headers on API responses | `backend/tests/test_security_headers.py` | T2.31 | Pass |
 | [x] T2.T17 | Test SSE route yields events in order over an async client | `backend/tests/test_routes_events.py` | T2.28, T2.T1 | Pass |
