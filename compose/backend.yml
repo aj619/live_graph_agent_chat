@@ -10,6 +10,20 @@
 # Uploads: DATA_DIR=uploads is relative to WORKDIR /app, so the app writes to
 # /app/uploads/uploads (main.py and routes_documents.py both join "uploads" onto DATA_DIR).
 # The volume is mounted at /app/uploads, which covers that path.
+#
+# No depends_on: Neo4j and MySQL are not services in this compose project
+# (compose/neo4j.yml and compose/mysql.yml are commented out of the root
+# include: list — they run in their own separate compose project, on the
+# external Docker network `shared_infra`, which this service also joins
+# below). Readiness is checked by the app itself at startup, not by Compose:
+# app.main's lifespan opens a real MySQL connection (registry.create_all) and
+# a real Neo4j connection (GraphService.start -> build_indices_and_constraints)
+# before the server accepts requests, and uvicorn exits with the connection
+# error logged if either is unreachable. NEO4J_URI/MYSQL_HOST in .env must be
+# set to the container names of the Neo4j/MySQL containers on shared_infra
+# (Docker's embedded DNS resolves them there), not the old in-network names
+# "neo4j"/"mysql" that only existed when compose/neo4j.yml and
+# compose/mysql.yml were included in this project.
 
 services:
   backend:
@@ -22,15 +36,23 @@ services:
     restart: unless-stopped
     env_file:
       # Relative to this file (compose/), so this is the .env at the repository root.
+      # This alone sets process env vars, but app.config deliberately re-reads a
+      # literal file from disk (see its module docstring) — the bind mount below
+      # and ENV_FILE_DIR give it that file at the path select_env_file() expects
+      # inside the container, where backend/Dockerfile's COPY flattens the nesting
+      # app.config's REPO_ROOT otherwise assumes.
       - ../.env
+    environment:
+      ENV_FILE_DIR: /app/env
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
       - lgac_backend_data:/app/uploads
+      - ../.env:/app/env/.env:ro
+      # Local BGE reranker's model weights (app/models.py), downloaded from the
+      # HuggingFace Hub on first use under HF_HOME (backend/Dockerfile). Persists
+      # the download across container recreates instead of re-fetching every time.
+      - lgac_hf_cache:/app/.cache/huggingface
     networks:
       - lgac
-    depends_on:
-      neo4j:
-        condition: service_healthy
-      mysql:
-        condition: service_healthy
+      - shared_infra

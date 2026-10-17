@@ -43,6 +43,10 @@ ENV_VALUES: dict[str, Any] = {
     "INGEST_CHUNK_CHARS": 1000,
     "INGEST_RETRIES": 2,
     "AGENT_MAX_REWRITES": 2,
+    # 0 by default so every existing call-count assertion in this file (written
+    # before query expansion existed) stays exact. Tests for expansion itself
+    # monkeypatch this up, the same way AGENT_MAX_REWRITES tests already do.
+    "AGENT_QUERY_EXPANSIONS": 0,
     "RETRIEVAL_LIMIT": 5,
     "GRAPH_SNAPSHOT_LIMIT": 100,
     "GRAPH_GROUP_ID": "test_group",
@@ -365,3 +369,113 @@ async def test_grade_with_none_retrieved_is_false_and_makes_no_llm_call(
 
     assert result["grounded"] is False
     assert fake_llm.invoke_calls == []
+
+
+# ---------------------------------------------------------------------------
+# 7. expand_query: pure parsing of the LLM's variant list
+# ---------------------------------------------------------------------------
+
+
+async def test_expand_query_parses_lines_dedupes_and_caps_to_limit(
+    agent_module: ModuleType,
+) -> None:
+    fake_llm = FakeChatModel(
+        invoke_reply=(
+            "variant one\n\nvariant one\nOriginal Question\nvariant two\nvariant three"
+        )
+    )
+
+    variants = await agent_module.expand_query(fake_llm, "Original Question", 2)
+
+    assert variants == ["variant one", "variant two"]
+    assert len(fake_llm.invoke_calls) == 1
+
+
+async def test_expand_query_with_zero_limit_skips_the_llm_call(
+    agent_module: ModuleType,
+) -> None:
+    fake_llm = FakeChatModel(invoke_reply="should never be seen")
+
+    variants = await agent_module.expand_query(fake_llm, "a question", 0)
+
+    assert variants == []
+    assert fake_llm.invoke_calls == []
+
+
+async def test_expand_query_with_only_duplicate_lines_returns_empty(
+    agent_module: ModuleType,
+) -> None:
+    fake_llm = FakeChatModel(invoke_reply="A question\n\nA QUESTION")
+
+    variants = await agent_module.expand_query(fake_llm, "A question", 3)
+
+    assert variants == []
+
+
+# ---------------------------------------------------------------------------
+# 8. The retrieve node expands the query and merges results from every variant
+# ---------------------------------------------------------------------------
+
+
+async def test_retrieve_node_expands_query_and_merges_results(
+    agent_module: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(agent_module.settings, "AGENT_QUERY_EXPANSIONS", 2)
+    fake_llm = FakeChatModel(invoke_reply="variant one\nvariant two")
+    fake_graph = FakeGraphService(
+        retrieve_results_by_query={
+            "original question": agent_module.RetrieveResult(
+                node_ids=["n1"],
+                edge_ids=["e1"],
+                facts=["fact one"],
+                node_names={"n1": "Node One"},
+            ),
+            "variant one": agent_module.RetrieveResult(
+                node_ids=["n1", "n2"],
+                edge_ids=["e1", "e2"],
+                facts=["fact one", "fact two"],
+                node_names={"n1": "Node One", "n2": "Node Two"},
+            ),
+            "variant two": agent_module.RetrieveResult(),
+        }
+    )
+    retrieve = agent_module.make_retrieve_node(fake_graph, fake_llm)
+    state = {
+        "chat_id": "chat-8",
+        "question": "original question",
+        "query": "original question",
+        "rewrites": 0,
+        "retrieved": None,
+        "grounded": False,
+    }
+
+    result = await retrieve(state)
+
+    assert fake_graph.retrieve_queries == ["original question", "variant one", "variant two"]
+    merged = result["retrieved"]
+    assert merged.node_ids == ["n1", "n2"]
+    assert merged.edge_ids == ["e1", "e2"]
+    assert merged.facts == ["fact one", "fact two"]
+    assert merged.node_names == {"n1": "Node One", "n2": "Node Two"}
+
+
+async def test_retrieve_node_with_expansions_disabled_calls_retrieve_once(
+    agent_module: ModuleType,
+) -> None:
+    fake_llm = FakeChatModel(invoke_reply="should never be seen")
+    fake_graph = FakeGraphService(retrieve_result=agent_module.RetrieveResult(facts=["a fact"]))
+    retrieve = agent_module.make_retrieve_node(fake_graph, fake_llm)
+    state = {
+        "chat_id": "chat-9",
+        "question": "a question",
+        "query": "a question",
+        "rewrites": 0,
+        "retrieved": None,
+        "grounded": False,
+    }
+
+    result = await retrieve(state)
+
+    assert fake_graph.retrieve_queries == ["a question"]
+    assert fake_llm.invoke_calls == []
+    assert result["retrieved"].facts == ["a fact"]

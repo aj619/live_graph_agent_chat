@@ -65,8 +65,11 @@ class FakeGraphService:
             raises `FakeFailure`. All other calls succeed.
         fail_insert_on_call: shorthand for `fail_on={"insert_episode": n}`.
             Merged into `fail_on` when both are given.
-        retrieve_result: what `retrieve()` returns. Defaults to an empty
-            `RetrieveResult`.
+        retrieve_result: what `retrieve()` returns for any query not in
+            `retrieve_results_by_query`. Defaults to an empty `RetrieveResult`.
+        retrieve_results_by_query: per-query overrides for `retrieve()`, e.g. to
+            give an expanded-query variant a different result than the original
+            query. A query not listed here falls back to `retrieve_result`.
         snapshot_result: what `snapshot()` returns. Defaults to an empty
             `GraphSnapshot`.
 
@@ -92,6 +95,7 @@ class FakeGraphService:
         fail_on: dict[str, int] | None = None,
         fail_insert_on_call: int | None = None,
         retrieve_result: RetrieveResult | None = None,
+        retrieve_results_by_query: dict[str, RetrieveResult] | None = None,
         snapshot_result: GraphSnapshot | None = None,
     ) -> None:
         self._fail_on: dict[str, int] = dict(fail_on or {})
@@ -99,6 +103,9 @@ class FakeGraphService:
             self._fail_on["insert_episode"] = fail_insert_on_call
         # None means "return an empty result"; the app.graph import is deferred until then.
         self._retrieve_result: RetrieveResult | None = retrieve_result
+        self._retrieve_results_by_query: dict[str, RetrieveResult] = dict(
+            retrieve_results_by_query or {}
+        )
         self._snapshot_result: GraphSnapshot | None = snapshot_result
 
         self.episodes: dict[str, dict[str, str]] = {}
@@ -145,9 +152,11 @@ class FakeGraphService:
         self.episodes.pop(episode_uuid, None)
 
     async def retrieve(self, query: str) -> RetrieveResult:
-        """Return the configured result and record the query."""
+        """Return the configured result for `query` and record the query."""
         self.retrieve_queries.append(query)
         self._tick("retrieve")
+        if query in self._retrieve_results_by_query:
+            return self._retrieve_results_by_query[query]
         if self._retrieve_result is None:
             return _empty_retrieve_result()
         return self._retrieve_result

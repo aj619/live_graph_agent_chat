@@ -16,7 +16,7 @@ import pytest
 from docx import Document
 from pypdf import PdfWriter
 
-from app.extract import UnsupportedDocument, extract_text
+from app.extract import UnsupportedDocument, _normalize_pdf_page, extract_text
 
 
 def _docx_bytes(*paragraphs: str) -> bytes:
@@ -48,6 +48,46 @@ def _text_pdf_bytes(text: str) -> bytes:
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
         (
             b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] "
+            b"/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>"
+        ),
+        b"<< /Length " + str(len(stream)).encode() + b" >>\nstream\n" + stream + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    out = bytearray(b"%PDF-1.4\n")
+    offsets: list[int] = []
+    for number, body in enumerate(objects, start=1):
+        offsets.append(len(out))
+        out += f"{number} 0 obj\n".encode() + body + b"\nendobj\n"
+    xref_at = len(out)
+    out += f"xref\n0 {len(objects) + 1}\n".encode()
+    out += b"0000000000 65535 f \n"
+    for offset in offsets:
+        out += f"{offset:010d} 00000 n \n".encode()
+    out += (
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_at}\n%%EOF\n"
+    ).encode()
+    return bytes(out)
+
+
+def _one_char_per_line_pdf_bytes(text: str) -> bytes:
+    """Build a PDF whose content stream positions every character on its own line.
+
+    Reproduces the real pypdf extraction artifact seen on some generated PDFs
+    (e.g. "Employment at Anthropic.pdf"): a Td (move text position) before every
+    single Tj (show text) call, each moving down one line, makes pypdf's own
+    line-break heuristic insert "\\n" between every character.
+    """
+    ops = ["BT /F1 24 Tf 20 190 Td"]
+    for char in text:
+        escaped = char.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+        ops.append(f"({escaped}) Tj 0 -10 Td")
+    ops.append("ET")
+    stream = " ".join(ops).encode("latin-1")
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        (
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 400] "
             b"/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>"
         ),
         b"<< /Length " + str(len(stream)).encode() + b" >>\nstream\n" + stream + b"\nendstream",
@@ -127,6 +167,29 @@ def test_pdf_with_magic_but_truncated_body_raises_unsupported_document() -> None
 def test_pdf_with_no_text_content_raises_unsupported_document() -> None:
     with pytest.raises(UnsupportedDocument):
         extract_text(_blank_pdf_bytes(), "pdf")
+
+
+def test_pdf_one_char_per_line_artifact_is_reconstructed() -> None:
+    """Regression test: a PDF that triggers pypdf's one-glyph-per-line extraction
+    must still come out as normal prose, not exploded into one-word "paragraphs"
+    by chunk_text()'s blank-line paragraph detection.
+    """
+    result = extract_text(_one_char_per_line_pdf_bytes("agent hours outnumber"), "pdf")
+    assert "agent hours outnumber" in result.replace("\n\n", "")
+
+
+def test_normalize_pdf_page_collapses_a_degenerate_page() -> None:
+    degenerate = "H\no\nw\n \na\nr\ne\n \ny\no\nu\n"
+    assert _normalize_pdf_page(degenerate) == "How are you"
+
+
+def test_normalize_pdf_page_leaves_a_normal_page_unchanged() -> None:
+    normal = "This is a normal line.\nThis is another wrapped line.\n\nNew paragraph."
+    assert _normalize_pdf_page(normal) == normal
+
+
+def test_normalize_pdf_page_handles_empty_text() -> None:
+    assert _normalize_pdf_page("") == ""
 
 
 # DOCX

@@ -8,7 +8,10 @@ dependencies = [
     "uvicorn[standard]",
     "pydantic-settings",
     "python-dotenv",
-    "graphiti-core",
+    "graphiti-core[sentence-transformers]",
+    # Declared directly (not just pulled in transitively via sentence-transformers)
+    # so the tool.uv.sources pin below reliably targets it.
+    "torch",
     "neo4j",
     "langgraph",
     "langchain-core",
@@ -24,6 +27,29 @@ dependencies = [
 
 [tool.uv]
 package = false
+
+# This backend only ever runs in backend/Dockerfile's Debian container, or locally
+# on Linux dev machines — never macOS/Windows. uv.lock is universal across platforms
+# by default; narrowing it to the one platform this project actually targets is what
+# lets the torch source pin below apply (PyTorch's CPU wheel index has no macOS
+# build, so an unrestricted universal lock falls back off the pin entirely rather
+# than apply it only where it can).
+environments = [
+    "sys_platform == 'linux'",
+]
+
+# sentence-transformers (pulled in by graphiti-core[sentence-transformers], for the
+# local BGE reranker) depends on torch. Left to the default PyPI resolution, uv
+# picks the CUDA build — nvidia-cudnn/nvidia-nccl/triton/cuda-bindings, ~1GB of
+# GPU libraries this container has no GPU to use. Pin torch to PyTorch's own
+# CPU-only wheel index instead.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
 
 [dependency-groups]
 dev = [

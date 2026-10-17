@@ -38,7 +38,14 @@ ENV_FILE_BY_APP_ENV: dict[str, str] = {
 
 
 def select_env_file() -> Path:
-    """Return the one env file that matches the APP_ENV process variable."""
+    """Return the one env file that matches the APP_ENV process variable.
+
+    The directory searched is REPO_ROOT by default, correct for a local
+    checkout where this file sits three levels under the repo root. A
+    container loses that nesting (backend/Dockerfile copies app/ straight
+    into /app, dropping the backend/ prefix), so ENV_FILE_DIR lets the
+    compose fragment that bind-mounts the real file point at it explicitly.
+    """
     if "APP_ENV" not in os.environ:
         raise RuntimeError(
             "APP_ENV is not set. Export APP_ENV=dev or APP_ENV=test to choose the env file."
@@ -48,7 +55,8 @@ def select_env_file() -> Path:
     if file_name is None:
         allowed = ", ".join(sorted(ENV_FILE_BY_APP_ENV))
         raise RuntimeError(f"APP_ENV must be one of: {allowed}. Got {app_env!r}.")
-    path = REPO_ROOT / file_name
+    root = Path(os.environ["ENV_FILE_DIR"]) if "ENV_FILE_DIR" in os.environ else REPO_ROOT
+    path = root / file_name
     if not path.is_file():
         raise RuntimeError(f"APP_ENV={app_env} needs {path}, which does not exist.")
     return path
@@ -84,6 +92,7 @@ class Settings(BaseSettings):
     INGEST_CHUNK_CHARS: int
     INGEST_RETRIES: int
     AGENT_MAX_REWRITES: int
+    AGENT_QUERY_EXPANSIONS: int
     RETRIEVAL_LIMIT: int
     GRAPH_SNAPSHOT_LIMIT: int
     GRAPH_GROUP_ID: str
@@ -95,8 +104,10 @@ class Settings(BaseSettings):
     MYSQL_DATABASE: str
     MYSQL_USER: str
     MYSQL_PASSWORD: str
-    # Read by the MySQL container at first start. The app does not use it.
-    MYSQL_ROOT_PASSWORD: str
+    # Read by compose/mysql.yml's own MySQL container at first start (bootstrap and
+    # healthcheck). The app itself never uses it. Optional: irrelevant when MYSQL_HOST
+    # points at an externally managed MySQL instance instead of that compose fragment.
+    MYSQL_ROOT_PASSWORD: str | None = None
 
     # 5.4 Neo4j
     NEO4J_URI: str

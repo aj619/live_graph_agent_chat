@@ -14,7 +14,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never \
     UV_PROJECT_ENVIRONMENT=/app/.venv \
-    PATH="/app/.venv/bin:${PATH}"
+    PATH="/app/.venv/bin:${PATH}" \
+    HF_HOME=/app/.cache/huggingface
 
 # Dedicated non-root user and group. No login shell, no home directory.
 RUN groupadd --system appgroup \
@@ -36,6 +37,20 @@ COPY --chown=appuser:appgroup backend/app ./app
 # /app itself must be writable by appuser so runtime paths such as uploads/
 # under DATA_DIR can be created. The .venv stays root-owned and read-only.
 RUN chown appuser:appgroup /app
+
+# Pre-create the volume mount point (compose/backend.yml mounts lgac_backend_data
+# here) owned by appuser. Docker initializes a fresh empty named volume's content
+# and permissions from whatever already exists in the image at its mount path, so
+# this is what makes /app/uploads (and the uploads/ subdir the app creates under
+# DATA_DIR inside it) writable by the non-root user at runtime, not just at build time.
+RUN mkdir -p /app/uploads && chown appuser:appgroup /app/uploads
+
+# Same reasoning, for the local reranker's model-weights cache (compose/backend.yml
+# mounts a volume here too): the BGE cross-encoder (app/models.py) downloads its
+# weights from the HuggingFace Hub on first use, under HF_HOME above. Pre-create and
+# chown it so that first download succeeds as appuser, and persists in the volume
+# across container recreates instead of re-downloading every time.
+RUN mkdir -p /app/.cache/huggingface && chown appuser:appgroup /app/.cache/huggingface
 
 USER appuser
 

@@ -4,7 +4,10 @@ The output is one plain string. Callers pass it to chunking.chunk_text().
 
 Supported extensions (plan decision D23: DOCX only, no .doc, no LibreOffice):
 - "pdf": the bytes must start with b"%PDF" (checked from byte 0). pypdf extracts the
-  text of every page; pages are joined with a blank line.
+  text of every page; pages are joined with a blank line. A pypdf artifact on some
+  PDFs (every glyph on its own line) is normalized away first (_normalize_pdf_page),
+  since it otherwise makes chunking.chunk_text() misread every inter-word space as
+  a paragraph break.
 - "docx": the bytes must open with python-docx. The text of every paragraph is joined
   with a newline.
 - "txt": the bytes are decoded as UTF-8 with replacement, so malformed bytes become
@@ -63,10 +66,29 @@ def _extract_pdf(content: bytes) -> str:
         raise UnsupportedDocument("PDF content does not start with %PDF")
     try:
         reader = PdfReader(io.BytesIO(content))
-        pages = [page.extract_text() or "" for page in reader.pages]
+        pages = [_normalize_pdf_page(page.extract_text() or "") for page in reader.pages]
     except (PdfReadError, ValueError, TypeError, KeyError, IndexError, OSError) as exc:
         raise UnsupportedDocument(f"PDF could not be parsed: {exc}") from exc
     return _PDF_PAGE_SEPARATOR.join(pages)
+
+
+def _normalize_pdf_page(text: str) -> str:
+    """Undo a pypdf extraction artifact seen on some PDFs: every glyph (including
+    plain spaces between words) lands on its own line, so most "lines" are zero or
+    one characters long. Left as is, chunking.chunk_text()'s paragraph-boundary
+    regex (a blank line, "\\n\\s*\\n") matches every inter-word space, exploding the
+    whole page into one-word "paragraphs" and badly skewing where chunk boundaries
+    fall. If most lines in this page are that short, the newlines carry no real
+    line-wrap information, so they are dropped before chunking ever sees them.
+    Unaffected (normally wrapped) pages are returned unchanged.
+    """
+    lines = text.split("\n")
+    if not lines:
+        return text
+    short_lines = sum(1 for line in lines if len(line) <= 1)
+    if short_lines / len(lines) > 0.5:
+        return "".join(lines)
+    return text
 
 
 def _extract_docx(content: bytes) -> str:

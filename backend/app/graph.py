@@ -29,6 +29,25 @@ from app.models import ModelClients, build_model_clients
 
 logger = logging.getLogger(__name__)
 
+# Graphiti's default extraction only reaches for named, concrete things (people,
+# organizations, products). Left alone, it skips bare statistics and comparisons
+# that name no such thing, e.g. "agent hours outnumber human hours 6 to 1" — even
+# when that sentence is sitting in the chunk's text untouched. Worse, even once
+# told to look for these, a paragraph with several competing statistics (e.g. five
+# different percentages in one paragraph) tends to get only one or two captured
+# and the rest silently dropped, favoring whichever reads most like a named-entity
+# story. This instruction is appended to every extraction prompt so every
+# statistic gets its own fact, not just the first or most story-like one.
+EXTRACTION_INSTRUCTIONS = (
+    "Pay close attention to specific statistics, metrics, percentages, and ratios "
+    "in the text (for example, 'X outnumbers Y 6 to 1', 'grew 30%', 'rose from 10% "
+    "to 13%'). Extract every one of these as its own entity or fact, even when it "
+    "describes an abstract quantity or comparison rather than a named person, "
+    "place, or organization, and even when several statistics appear in the same "
+    "paragraph or sentence. Do not extract only the most prominent or most "
+    "narrative one and drop the rest — each distinct number is its own fact."
+)
+
 
 @dataclass(frozen=True)
 class RetrieveResult:
@@ -45,6 +64,49 @@ class RetrieveResult:
     facts: list[str] = field(default_factory=list)
     episode_uuids_by_edge: dict[str, list[str]] = field(default_factory=dict)
     node_names: dict[str, str] = field(default_factory=dict)
+
+
+def merge_retrieve_results(results: list[RetrieveResult]) -> RetrieveResult:
+    """Union several RetrieveResult (e.g. one per expanded query) into one.
+
+    Dedupes node_ids and edge_ids by id, in first-seen order, across all the
+    given results. facts stays parallel to the deduped edge_ids. episode_uuids
+    for an edge seen in more than one result are unioned (still deduped, order
+    preserved). node_names keeps whichever result named a given node first —
+    the same id is always the same underlying node, so this is only a
+    tie-break, not a real conflict.
+    """
+    node_ids: list[str] = []
+    edge_ids: list[str] = []
+    facts: list[str] = []
+    episode_uuids_by_edge: dict[str, list[str]] = {}
+    node_names: dict[str, str] = {}
+
+    seen_nodes: set[str] = set()
+    seen_edges: set[str] = set()
+    for result in results:
+        for node_id in result.node_ids:
+            if node_id not in seen_nodes:
+                seen_nodes.add(node_id)
+                node_ids.append(node_id)
+            node_names.setdefault(node_id, result.node_names.get(node_id, ""))
+        for edge_id, fact in zip(result.edge_ids, result.facts, strict=True):
+            if edge_id not in seen_edges:
+                seen_edges.add(edge_id)
+                edge_ids.append(edge_id)
+                facts.append(fact)
+            existing = episode_uuids_by_edge.setdefault(edge_id, [])
+            for episode_uuid in result.episode_uuids_by_edge.get(edge_id, []):
+                if episode_uuid not in existing:
+                    existing.append(episode_uuid)
+
+    return RetrieveResult(
+        node_ids=node_ids,
+        edge_ids=edge_ids,
+        facts=facts,
+        episode_uuids_by_edge=episode_uuids_by_edge,
+        node_names=node_names,
+    )
 
 
 @dataclass(frozen=True)
@@ -158,6 +220,7 @@ class GraphService:
             source=EpisodeType.text,
             group_id=self._group_id,
             uuid=episode_uuid,
+            custom_extraction_instructions=EXTRACTION_INSTRUCTIONS,
         )
 
     async def remove_episode(self, episode_uuid: str) -> None:
@@ -177,6 +240,23 @@ class GraphService:
 
     async def retrieve(self, query: str) -> RetrieveResult:
         """Run the cross-encoder hybrid search, limited to this service's group.
+
+        Earlier this used COMBINED_HYBRID_SEARCH_RRF instead: graphiti-core's
+        cross-encoder reranker used to call an *API* LLM (OpenAIRerankerClient)
+        once per candidate node/edge, concurrently, across multiple sub-searches
+        at once — with a third-party gateway enforcing a low per-model
+        concurrency cap, that reliably produced 429s and, under retry pressure, a
+        crash in graphiti-core's reranker itself (a response missing logprobs
+        breaks its zip(..., strict=True)). The `reranker` client built in
+        app/models.py is now BGERerankerClient — a local, no-API cross-encoder
+        model (sentence-transformers) — so that whole failure mode no longer
+        applies, and reranking quality is worth having back.
+
+        This recipe also runs a bounded BFS hop from whatever BM25/cosine search
+        already matched, as one of its candidate-gathering search methods — free
+        one-hop graph traversal on top of the direct text/vector matches. On a
+        sparse graph this finds little extra; it only pays off once a document's
+        facts are dense enough to have real cross-references to walk.
 
         The recipe is copied with `limit` set from `RETRIEVAL_LIMIT`. Only edges
         carry facts and episode references, so the per-edge episode UUIDs are

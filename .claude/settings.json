@@ -23,11 +23,15 @@
       "Write(//home/beast/Projects/Softwares/Portfolio/live_graph_agent_chat/.claude/state/runs/**)",
       "Edit(//home/beast/Projects/Softwares/Portfolio/live_graph_agent_chat/.claude/state/runs/**)",
       "Write(//home/beast/Projects/Softwares/Portfolio/lgac-worktrees/**)",
-      "Edit(//home/beast/Projects/Softwares/Portfolio/lgac-worktrees/**)"
+      "Edit(//home/beast/Projects/Softwares/Portfolio/lgac-worktrees/**)",
+      "Bash(docker compose up:*)",
+      "Bash(docker compose logs:*)",
+      "Bash(docker compose ps:*)",
+      "Bash(docker compose build:*)",
+      "Bash(docker inspect:*)",
+      "Bash(docker network inspect:*)"
     ],
     "deny": [
-      "Bash(docker:*)",
-      "Bash(docker-compose:*)",
       "Bash(git push:*)",
       "Bash(git reset --hard:*)",
       "Bash(rm -rf:*)",

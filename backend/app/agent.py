@@ -17,8 +17,11 @@ State (`AgentState`, a TypedDict):
 Node wiring: each node that needs a dependency is built by a factory and
 returned as a closure with the LangGraph node signature
 `async (AgentState) -> AgentState`. The caller passes the dependency in:
-- `make_retrieve_node(graph)` takes a `GraphService`. The shared instance is
-  owned by the caller (T2.29), not built here.
+- `make_retrieve_node(graph, llm)` takes a `GraphService` (shared instance,
+  owned by the caller, T2.29) and the agent LLM. It expands the query into
+  AGENT_QUERY_EXPANSIONS variants (rephrasings plus a HyDE-style hypothetical
+  passage, see `expand_query`), runs `graph.retrieve` for the original query and
+  every variant concurrently, and merges the results.
 - `make_grade_node(llm)` takes an agent LLM, typically from `build_agent_llm()`.
 
 Each node returns a full new state dict. It does not mutate the input.
@@ -52,7 +55,7 @@ from sqlalchemy import select
 from app.config import Settings, settings
 from app.db import SessionLocal
 from app.events import EventBus
-from app.graph import GraphService, RetrieveResult
+from app.graph import GraphService, RetrieveResult, merge_retrieve_results
 from app.registry import InsertionChunk
 from app.tracing import get_callback_handlers
 
@@ -89,16 +92,86 @@ def build_agent_llm(cfg: Settings = settings) -> ChatOpenAI:
     )
 
 
-def make_retrieve_node(graph: GraphService) -> Callable[[AgentState], Awaitable[AgentState]]:
-    """Return the retrieve node, which runs a graph search for the state's `query`.
+def _expand_query_prompt(question: str, limit: int) -> str:
+    """Build the prompt asking the agent LLM for alternative search strings."""
+    return (
+        "A search system needs to find facts in a document that answer this "
+        f"question:\n{question}\n\n"
+        f"Write {limit} alternative search queries that might find the same facts, "
+        "each on its own line, nothing else. Phrase at least one of them as a short "
+        "factual statement that could appear in the document itself, not as a "
+        "question — for example, if the question asks about a ratio, phrase one line "
+        "as a plausible statement of that ratio. Do not number the lines or add any "
+        "other text."
+    )
+
+
+async def expand_query(llm: ChatOpenAI, question: str, limit: int) -> list[str]:
+    """Return up to `limit` alternative search strings for `question`, or [] for none.
+
+    A mix of rephrasings and at least one hypothetical-passage-style line (the
+    HyDE technique): phrasing one variant as a statement rather than a question
+    often matches the source text's own wording better than the question does.
+    Lines identical to the question (case-insensitive) or empty after stripping
+    are dropped, as are duplicates. `limit <= 0` skips the LLM call and returns
+    [], so the caller falls back to searching with only the original query.
+
+    Args:
+        llm: The agent chat model. Only its async `ainvoke` is used.
+        question: The question to generate search-query variants for.
+        limit: The maximum number of variants to return.
+    """
+    if limit <= 0:
+        return []
+    response = await llm.ainvoke(
+        _expand_query_prompt(question, limit),
+        config={"callbacks": get_callback_handlers()},
+    )
+    content = response.content if isinstance(response.content, str) else str(response.content)
+    seen = {question.strip().lower()}
+    variants: list[str] = []
+    for line in content.splitlines():
+        candidate = line.strip()
+        if not candidate or candidate.lower() in seen:
+            continue
+        seen.add(candidate.lower())
+        variants.append(candidate)
+        if len(variants) >= limit:
+            break
+    return variants
+
+
+def make_retrieve_node(
+    graph: GraphService, llm: ChatOpenAI
+) -> Callable[[AgentState], Awaitable[AgentState]]:
+    """Return the retrieve node: expands the query, searches for each variant, merges.
+
+    Runs `expand_query` once (AGENT_QUERY_EXPANSIONS variants, or none when that
+    setting is 0), then runs `graph.retrieve` for the original query and every
+    variant concurrently, and merges the results with `merge_retrieve_results`.
+    Every `retrieve` call does Neo4j-local work plus a local reranking model
+    (see app/graph.py and app/models.py) — no provider API calls — so running
+    several concurrently carries no rate-limit risk; only the one expansion LLM
+    call above has that cost.
 
     Args:
         graph: The service whose `retrieve` runs the hybrid search.
+        llm: The agent chat model used to generate query variants.
     """
 
     async def retrieve(state: AgentState) -> AgentState:
-        result = await graph.retrieve(state["query"])
-        return {**state, "retrieved": result}
+        query = state["query"]
+        variants = await expand_query(llm, query, settings.AGENT_QUERY_EXPANSIONS)
+        if not variants:
+            # No expansion (disabled, or the LLM returned nothing usable): skip
+            # merge_retrieve_results entirely, not just as an optimization. It
+            # enforces facts/edge_ids being parallel lists (the dataclass's own
+            # documented invariant), which a single real GraphService.retrieve
+            # result always satisfies — merging is only needed, and only safe to
+            # assume that invariant for, once there is more than one result.
+            return {**state, "retrieved": await graph.retrieve(query)}
+        results = await asyncio.gather(*(graph.retrieve(q) for q in (query, *variants)))
+        return {**state, "retrieved": merge_retrieve_results(list(results))}
 
     return retrieve
 
@@ -306,7 +379,7 @@ def build_agent_graph(
         bus: The event bus the answer node publishes to.
     """
     builder: StateGraph[AgentState, None, AgentState, AgentState] = StateGraph(AgentState)
-    builder.add_node("retrieve", _as_graph_node(make_retrieve_node(graph)))
+    builder.add_node("retrieve", _as_graph_node(make_retrieve_node(graph, llm)))
     builder.add_node("grade", _as_graph_node(make_grade_node(llm)))
     builder.add_node("rewrite", _as_graph_node(make_rewrite_node(llm)))
     builder.add_node("answer", _as_graph_node(make_answer_node(llm, bus)))

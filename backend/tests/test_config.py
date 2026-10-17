@@ -34,6 +34,7 @@ VALUES: dict[str, Any] = {
     "INGEST_CHUNK_CHARS": 1000,
     "INGEST_RETRIES": 2,
     "AGENT_MAX_REWRITES": 2,
+    "AGENT_QUERY_EXPANSIONS": 2,
     "RETRIEVAL_LIMIT": 5,
     "GRAPH_SNAPSHOT_LIMIT": 100,
     "GRAPH_GROUP_ID": "dev-group",
@@ -44,7 +45,6 @@ VALUES: dict[str, Any] = {
     "MYSQL_DATABASE": "placeholder_db",
     "MYSQL_USER": "placeholder_user",
     "MYSQL_PASSWORD": "placeholder-mysql-password",
-    "MYSQL_ROOT_PASSWORD": "placeholder-mysql-root-password",
     # 5.4 Neo4j
     "NEO4J_URI": "bolt://neo4j:7687",
     "NEO4J_USER": "neo4j",
@@ -84,12 +84,15 @@ VALUES: dict[str, Any] = {
     "MINIO_ROOT_PASSWORD": "placeholder-minio-password",
 }
 
-# The four optional LANGFUSE_INIT_* fields. They default to None.
+# The optional fields. They default to None. MYSQL_ROOT_PASSWORD only matters to
+# compose/mysql.yml's own container bootstrap/healthcheck, not to the app, so it is
+# optional for setups that point MYSQL_HOST at an externally managed instance instead.
 OPTIONAL_FIELDS = (
     "LANGFUSE_INIT_ORG_ID",
     "LANGFUSE_INIT_PROJECT_ID",
     "LANGFUSE_INIT_USER_EMAIL",
     "LANGFUSE_INIT_USER_PASSWORD",
+    "MYSQL_ROOT_PASSWORD",
 )
 
 # One required field from each plan §5 group, plus the last field of the file.
@@ -97,7 +100,7 @@ SAMPLE_REQUIRED_FIELDS = (
     "API_TOKEN",  # 5.1 Security
     "MAX_FILE_SIZE_MB",  # 5.2 Limits
     "GRAPH_GROUP_ID",  # 5.2 Limits (the field that differs between dev and test)
-    "MYSQL_ROOT_PASSWORD",  # 5.3 Storage
+    "MYSQL_DATABASE",  # 5.3 Storage
     "NEO4J_URI",  # 5.4 Neo4j
     "LLM_MODEL",  # 5.5 Extraction and embedding models
     "AGENT_LLM_TEMPERATURE",  # 5.6 Agent model
@@ -223,10 +226,10 @@ def test_missing_required_field_fails_and_names_it(
     assert field in str(excinfo.value)
 
 
-# --- optional LANGFUSE_INIT_* fields ------------------------------------
+# --- optional fields ----------------------------------------------------
 
 
-def test_file_without_langfuse_init_fields_loads_with_them_none(
+def test_file_without_optional_fields_loads_with_them_none(
     config: types.ModuleType, repo_root: Path, process_env: dict[str, str]
 ) -> None:
     _write_env_file(repo_root / ".env", VALUES, app_env="dev")

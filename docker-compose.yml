@@ -6,8 +6,8 @@
 name: lgac
 
 include:
-  - compose/neo4j.yml
-  - compose/mysql.yml
+  # - compose/neo4j.yml
+  # - compose/mysql.yml
   - compose/langfuse-data.yml
   - compose/langfuse-app.yml
   - compose/backend.yml
@@ -16,6 +16,8 @@ include:
 networks:
   lgac:
     driver: bridge
+  shared_infra:
+    external: true
 
 volumes:
   lgac_neo4j_data: {}
@@ -24,3 +26,4 @@ volumes:
   lgac_clickhouse_data: {}
   lgac_minio_data: {}
   lgac_backend_data: {}
+  lgac_hf_cache: {}
