@@ -11,6 +11,10 @@
 # /app/uploads/uploads (main.py and routes_documents.py both join "uploads" onto DATA_DIR).
 # The volume is mounted at /app/uploads, which covers that path.
 #
+# Logs: app/call_logging.py writes one file per chat request to logs/<chat_id>.log,
+# relative to WORKDIR /app. Bind-mounted (not a named volume) so the owner can read
+# them straight from the repository checkout at ../logs, which is gitignored.
+#
 # No depends_on: Neo4j and MySQL are not services in this compose project
 # (compose/neo4j.yml and compose/mysql.yml are commented out of the root
 # include: list — they run in their own separate compose project, on the
@@ -48,6 +52,7 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - lgac_backend_data:/app/uploads
+      - ../logs:/app/logs
       - ../.env:/app/env/.env:ro
       # Local BGE reranker's model weights (app/models.py), downloaded from the
       # HuggingFace Hub on first use under HF_HOME (backend/Dockerfile). Persists

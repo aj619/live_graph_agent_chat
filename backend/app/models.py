@@ -4,19 +4,20 @@ Builds the three model clients Graphiti needs from `Settings`:
 
 - LLM: OpenAIGenericClient configured with LLMConfig.
 - Embedder: OpenAIEmbedder configured with OpenAIEmbedderConfig.
-- Reranker: BGERerankerClient — a local sentence-transformers cross-encoder
-  (BAAI/bge-reranker-v2-m3), not an API client. No Settings go into it: it has
-  no base URL or key to configure, and downloads its model weights from the
-  HuggingFace Hub on first use instead of calling a configured provider.
+- Reranker: depends on RERANKER_ENABLED (app/config.py). When true,
+  `ExternalRerankerClient` (app/reranker.py) calls the Cohere-compatible
+  RERANKER_BASE_URL/API_KEY/MODEL endpoint. When false, `NoopRerankerClient`
+  is used instead and no reranking call is made at all — app/graph.py also
+  switches its search recipe off cross-encoder reranking in that case, so
+  `.rank()` is never even called in normal operation.
 
 The LLM and embedder use the OpenAI-compatible base URL and key from Settings.
 No model name, URL, key, or provider name is written in this file.
 
 Constructing the LLM/embedder clients does not contact a model server. The
 underlying HTTP client only stores the base URL and key; the first network
-call happens when Graphiti calls the client. Constructing the reranker *can*
-contact a server (the HuggingFace Hub) the first time it runs, to fetch model
-weights; after that they're cached on disk and no network call is needed.
+call happens when Graphiti calls the client. Constructing the reranker never
+contacts a server either, for the same reason.
 
 Tests inject a fake client for any of the three by passing it as a keyword
 override. Only the clients that are not supplied are built from Settings.
@@ -25,12 +26,13 @@ override. Only the clients that are not supplied are built from Settings.
 from dataclasses import dataclass
 from typing import Any
 
-from graphiti_core.cross_encoder.bge_reranker_client import BGERerankerClient
 from graphiti_core.embedder.openai import OpenAIEmbedder, OpenAIEmbedderConfig
 from graphiti_core.llm_client.config import LLMConfig
 from graphiti_core.llm_client.openai_generic_client import OpenAIGenericClient
 
+from app.call_logging import wrap_timed_method
 from app.config import Settings, settings
+from app.reranker import ExternalRerankerClient, NoopRerankerClient
 
 
 @dataclass(frozen=True)
@@ -70,11 +72,40 @@ def build_model_clients(
         embedding_model=cfg.EMBEDDING_MODEL,
     )
 
+    built_llm_client = llm_client is None
+    built_embedder = embedder is None
+    built_reranker = reranker is None
+
+    resolved_llm_client = (
+        llm_client if llm_client is not None else OpenAIGenericClient(config=llm_config)
+    )
+    resolved_embedder = (
+        embedder if embedder is not None else OpenAIEmbedder(config=embedder_config)
+    )
+    if reranker is not None:
+        resolved_reranker = reranker
+    elif cfg.RERANKER_ENABLED:
+        resolved_reranker = ExternalRerankerClient(
+            base_url=cfg.RERANKER_BASE_URL,
+            api_key=cfg.RERANKER_API_KEY,
+            model=cfg.RERANKER_MODEL,
+        )
+    else:
+        resolved_reranker = NoopRerankerClient()
+
+    # Per-chat timing log (app/call_logging.py): only wrap clients built here, from
+    # Settings, never a caller-supplied (test) client, so existing tests that assert
+    # call counts or arguments on a fake see it unchanged.
+    if built_llm_client:
+        wrap_timed_method(resolved_llm_client, "generate_response", "graph_llm")
+    if built_embedder:
+        wrap_timed_method(resolved_embedder, "create", "embedding")
+        wrap_timed_method(resolved_embedder, "create_batch", "embedding")
+    if built_reranker:
+        wrap_timed_method(resolved_reranker, "rank", "reranker")
+
     return ModelClients(
-        llm_client=llm_client if llm_client is not None else OpenAIGenericClient(config=llm_config),
-        embedder=embedder if embedder is not None else OpenAIEmbedder(config=embedder_config),
-        # Local cross-encoder (sentence-transformers, BAAI/bge-reranker-v2-m3) — no API
-        # calls, so no provider rate limit to exceed. Takes no config: it has nothing to
-        # point at a base URL or key for.
-        reranker=reranker if reranker is not None else BGERerankerClient(),  # type: ignore[no-untyped-call]
+        llm_client=resolved_llm_client,
+        embedder=resolved_embedder,
+        reranker=resolved_reranker,
     )

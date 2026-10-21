@@ -59,6 +59,11 @@ VALUES: dict[str, Any] = {
     "EMBEDDING_BASE_URL": "http://embed.invalid/v1",
     "EMBEDDING_API_KEY": "placeholder-embedding-key",
     "EMBEDDING_MODEL": "placeholder-embedding-model",
+    # 5.5b Reranker
+    "RERANKER_ENABLED": False,
+    "RERANKER_BASE_URL": "http://rerank.invalid/v1",
+    "RERANKER_API_KEY": "placeholder-rerank-key",
+    "RERANKER_MODEL": "placeholder-rerank-model",
     # 5.6 Agent model
     "AGENT_LLM_BASE_URL": "http://agent.invalid/v1",
     "AGENT_LLM_API_KEY": "placeholder-agent-key",

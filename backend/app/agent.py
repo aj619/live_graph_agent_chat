@@ -42,6 +42,7 @@ word counts as NO. A reply with no facts is NO and makes no model call.
 import asyncio
 import logging
 import re
+import time
 import uuid
 from collections.abc import Awaitable, Callable
 from typing import Literal, TypedDict
@@ -52,6 +53,7 @@ from langgraph.graph.state import CompiledStateGraph
 from pydantic import SecretStr
 from sqlalchemy import select
 
+from app.call_logging import log_call, start_chat_log, timed
 from app.config import Settings, settings
 from app.db import SessionLocal
 from app.events import EventBus
@@ -123,9 +125,12 @@ async def expand_query(llm: ChatOpenAI, question: str, limit: int) -> list[str]:
     """
     if limit <= 0:
         return []
-    response = await llm.ainvoke(
-        _expand_query_prompt(question, limit),
-        config={"callbacks": get_callback_handlers()},
+    response = await timed(
+        "agent_llm_expand_query",
+        llm.ainvoke(
+            _expand_query_prompt(question, limit),
+            config={"callbacks": get_callback_handlers()},
+        ),
     )
     content = response.content if isinstance(response.content, str) else str(response.content)
     seen = {question.strip().lower()}
@@ -210,9 +215,12 @@ def make_grade_node(llm: ChatOpenAI) -> Callable[[AgentState], Awaitable[AgentSt
         facts = retrieved.facts if retrieved is not None else []
         if not facts:
             return {**state, "grounded": False}
-        response = await llm.ainvoke(
-            _grade_prompt(state["question"], facts),
-            config={"callbacks": get_callback_handlers()},
+        response = await timed(
+            "agent_llm_grade",
+            llm.ainvoke(
+                _grade_prompt(state["question"], facts),
+                config={"callbacks": get_callback_handlers()},
+            ),
         )
         content = response.content if isinstance(response.content, str) else str(response.content)
         return {**state, "grounded": parse_verdict(content)}
@@ -243,9 +251,12 @@ def make_rewrite_node(llm: ChatOpenAI) -> Callable[[AgentState], Awaitable[Agent
     """
 
     async def rewrite(state: AgentState) -> AgentState:
-        response = await llm.ainvoke(
-            _rewrite_prompt(state["question"], state["query"]),
-            config={"callbacks": get_callback_handlers()},
+        response = await timed(
+            "agent_llm_rewrite",
+            llm.ainvoke(
+                _rewrite_prompt(state["question"], state["query"]),
+                config={"callbacks": get_callback_handlers()},
+            ),
         )
         content = response.content if isinstance(response.content, str) else str(response.content)
         new_query = content.strip() or state["question"]
@@ -338,13 +349,17 @@ def make_answer_node(
             },
         )
 
-        async for chunk in llm.astream(
-            _answer_prompt(state["question"], retrieved.facts),
-            config={"callbacks": get_callback_handlers()},
-        ):
-            text = chunk.content if isinstance(chunk.content, str) else ""
-            if text:
-                bus.publish("chat.token", {"chat_id": chat_id, "token": text})
+        start = time.monotonic()
+        try:
+            async for chunk in llm.astream(
+                _answer_prompt(state["question"], retrieved.facts),
+                config={"callbacks": get_callback_handlers()},
+            ):
+                text = chunk.content if isinstance(chunk.content, str) else ""
+                if text:
+                    bus.publish("chat.token", {"chat_id": chat_id, "token": text})
+        finally:
+            log_call("agent_llm_answer", time.monotonic() - start)
 
         return {**state}
 
@@ -408,17 +423,18 @@ async def run(chat_id: str, question: str, graph: GraphService, bus: EventBus) -
         bus: The shared event bus for this process.
     """
     try:
-        llm = build_agent_llm()
-        compiled = build_agent_graph(graph, llm, bus)
-        initial_state: AgentState = {
-            "chat_id": chat_id,
-            "question": question,
-            "query": question,
-            "rewrites": 0,
-            "retrieved": None,
-            "grounded": False,
-        }
-        await compiled.ainvoke(initial_state, config={"callbacks": get_callback_handlers()})
+        with start_chat_log(chat_id):
+            llm = build_agent_llm()
+            compiled = build_agent_graph(graph, llm, bus)
+            initial_state: AgentState = {
+                "chat_id": chat_id,
+                "question": question,
+                "query": question,
+                "rewrites": 0,
+                "retrieved": None,
+                "grounded": False,
+            }
+            await compiled.ainvoke(initial_state, config={"callbacks": get_callback_handlers()})
     except Exception:
         logger.exception("agent run failed for chat %s", chat_id)
         bus.publish("chat.error", {"chat_id": chat_id, "message": AGENT_ERROR_MESSAGE})

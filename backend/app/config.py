@@ -125,6 +125,17 @@ class Settings(BaseSettings):
     EMBEDDING_API_KEY: str
     EMBEDDING_MODEL: str
 
+    # 5.5b Reranker (optional external cross-encoder — app/reranker.py)
+    # Mirrors the LANGFUSE_ENABLED pattern: disabled by default, and the three
+    # fields below are only read when RERANKER_ENABLED=true (a placeholder
+    # value is fine otherwise, since nothing dereferences it). When disabled,
+    # app/graph.py skips the cross-encoder reranking step entirely (plain RRF)
+    # instead of falling back to any local model.
+    RERANKER_ENABLED: bool
+    RERANKER_BASE_URL: str
+    RERANKER_API_KEY: str
+    RERANKER_MODEL: str
+
     # 5.6 Agent model
     AGENT_LLM_BASE_URL: str
     AGENT_LLM_API_KEY: str

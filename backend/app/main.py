@@ -6,7 +6,8 @@ Importing this module:
 - builds the MySQL engine through app.db (no connection is opened yet).
 
 The lifespan runs on every boot, in this order:
-1. create the DATA_DIR/uploads directory;
+1. create the DATA_DIR/uploads directory and the per-chat call-timing log
+   directory (app/call_logging.py);
 2. create the MySQL tables;
 3. start the graph service (needs a reachable Neo4j);
 4. run startup recovery, which must finish before the app serves requests.
@@ -27,6 +28,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app import db  # noqa: F401  (imported so the engine is built before create_all)
+from app.call_logging import LOG_DIR
 from app.config import settings
 from app.events import EventBus
 from app.graph import GraphService
@@ -52,6 +54,7 @@ GENERIC_ERROR_DETAIL = "Internal server error."
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Prepare storage, tables, the graph service, and recovery before serving."""
     Path(settings.DATA_DIR).joinpath("uploads").mkdir(parents=True, exist_ok=True)
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
     create_all()
     graph = GraphService()
     await graph.start()

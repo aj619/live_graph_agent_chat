@@ -5,6 +5,9 @@
 # Runtime data: uploads and the local SQLite/MySQL volumes
 data/
 
+# Per-chat call-timing logs (backend/app/call_logging.py)
+logs/
+
 # Python
 .venv/
 __pycache__/

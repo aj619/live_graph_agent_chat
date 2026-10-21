@@ -15,6 +15,7 @@ clients the caller does not supply are built from Settings through
 """
 
 import logging
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -22,12 +23,63 @@ from graphiti_core import Graphiti
 from graphiti_core.driver.neo4j_driver import Neo4jDriver
 from graphiti_core.errors import NodeNotFoundError
 from graphiti_core.nodes import EpisodeType, EpisodicNode
+from graphiti_core.search.search_config import (
+    CommunityReranker,
+    CommunitySearchConfig,
+    CommunitySearchMethod,
+    EdgeReranker,
+    EdgeSearchConfig,
+    EdgeSearchMethod,
+    EpisodeReranker,
+    EpisodeSearchConfig,
+    EpisodeSearchMethod,
+    NodeReranker,
+    NodeSearchConfig,
+    NodeSearchMethod,
+    SearchConfig,
+)
 from graphiti_core.search.search_config_recipes import COMBINED_HYBRID_SEARCH_CROSS_ENCODER
 
+from app.call_logging import log_call
 from app.config import Settings, settings
 from app.models import ModelClients, build_model_clients
 
 logger = logging.getLogger(__name__)
+
+# Same search methods as COMBINED_HYBRID_SEARCH_CROSS_ENCODER (bm25 + cosine + the
+# BFS hop expansion), but reranked with plain RRF instead of a cross-encoder call.
+# Used in retrieve() when settings.RERANKER_ENABLED is False (app/config.py), so
+# disabling reranking skips only the reranking step itself — BFS hop expansion
+# still runs — rather than falling back to a different retrieval shape entirely.
+# Written out directly (not derived from COMBINED_HYBRID_SEARCH_CROSS_ENCODER via
+# model_copy) because every *_config field on SearchConfig is typed `X | None`, so
+# a derived copy cannot be checked as always non-None the way a literal one can.
+NO_RERANK_HYBRID_SEARCH = SearchConfig(
+    edge_config=EdgeSearchConfig(
+        search_methods=[
+            EdgeSearchMethod.bm25,
+            EdgeSearchMethod.cosine_similarity,
+            EdgeSearchMethod.bfs,
+        ],
+        reranker=EdgeReranker.rrf,
+    ),
+    node_config=NodeSearchConfig(
+        search_methods=[
+            NodeSearchMethod.bm25,
+            NodeSearchMethod.cosine_similarity,
+            NodeSearchMethod.bfs,
+        ],
+        reranker=NodeReranker.rrf,
+    ),
+    episode_config=EpisodeSearchConfig(
+        search_methods=[EpisodeSearchMethod.bm25],
+        reranker=EpisodeReranker.rrf,
+    ),
+    community_config=CommunitySearchConfig(
+        search_methods=[CommunitySearchMethod.bm25, CommunitySearchMethod.cosine_similarity],
+        reranker=CommunityReranker.rrf,
+    ),
+)
 
 # Graphiti's default extraction only reaches for named, concrete things (people,
 # organizations, products). Left alone, it skips bare statistics and comparisons
@@ -171,6 +223,11 @@ class GraphService:
         self._group_id = cfg.GRAPH_GROUP_ID
         self._retrieval_limit = cfg.RETRIEVAL_LIMIT
         self._snapshot_limit = cfg.GRAPH_SNAPSHOT_LIMIT
+        self._search_config = (
+            COMBINED_HYBRID_SEARCH_CROSS_ENCODER
+            if cfg.RERANKER_ENABLED
+            else NO_RERANK_HYBRID_SEARCH
+        )
 
     async def start(self) -> None:
         """Create the Neo4j indices and constraints. Needs a reachable Neo4j."""
@@ -239,21 +296,26 @@ class GraphService:
             logger.info("episode %s not found, treating as already removed", episode_uuid)
 
     async def retrieve(self, query: str) -> RetrieveResult:
-        """Run the cross-encoder hybrid search, limited to this service's group.
+        """Run the hybrid search, limited to this service's group.
 
-        Earlier this used COMBINED_HYBRID_SEARCH_RRF instead: graphiti-core's
-        cross-encoder reranker used to call an *API* LLM (OpenAIRerankerClient)
-        once per candidate node/edge, concurrently, across multiple sub-searches
-        at once — with a third-party gateway enforcing a low per-model
-        concurrency cap, that reliably produced 429s and, under retry pressure, a
-        crash in graphiti-core's reranker itself (a response missing logprobs
-        breaks its zip(..., strict=True)). The `reranker` client built in
-        app/models.py is now BGERerankerClient — a local, no-API cross-encoder
-        model (sentence-transformers) — so that whole failure mode no longer
-        applies, and reranking quality is worth having back.
+        Which of the two recipes built at the top of this module runs — picked once,
+        in __init__, as self._search_config — depends on settings.RERANKER_ENABLED:
 
-        This recipe also runs a bounded BFS hop from whatever BM25/cosine search
-        already matched, as one of its candidate-gathering search methods — free
+        - True: COMBINED_HYBRID_SEARCH_CROSS_ENCODER. The `reranker` client built in
+          app/models.py calls RERANKER_BASE_URL/API_KEY/MODEL (app/reranker.py's
+          ExternalRerankerClient) once per batch of candidates. graphiti-core's older
+          default here, OpenAIRerankerClient, called an *API* LLM once per candidate
+          node/edge concurrently — with a third-party gateway enforcing a low
+          per-model concurrency cap, that reliably produced 429s and, under retry
+          pressure, a crash in graphiti-core's reranker itself (a response missing
+          logprobs breaks its zip(..., strict=True)). A single batched call per
+          dedicated rerank endpoint does not share that failure mode.
+        - False: NO_RERANK_HYBRID_SEARCH. No reranking call is made at all —
+          app/models.py builds a NoopRerankerClient that is never invoked by this
+          recipe — and candidates are combined with plain RRF instead.
+
+        Both recipes also run a bounded BFS hop from whatever BM25/cosine search
+        already matched, as one of their candidate-gathering search methods — free
         one-hop graph traversal on top of the direct text/vector matches. On a
         sparse graph this finds little extra; it only pays off once a document's
         facts are dense enough to have real cross-references to walk.
@@ -269,14 +331,16 @@ class GraphService:
             The node UUIDs, the edge UUIDs, the fact text of each edge, and the
             episode UUIDs of each edge.
         """
-        config = COMBINED_HYBRID_SEARCH_CROSS_ENCODER.model_copy(
-            update={"limit": self._retrieval_limit}
-        )
-        results = await self.graphiti.search_(
-            query,
-            config=config,
-            group_ids=[self._group_id],
-        )
+        config = self._search_config.model_copy(update={"limit": self._retrieval_limit})
+        start = time.monotonic()
+        try:
+            results = await self.graphiti.search_(
+                query,
+                config=config,
+                group_ids=[self._group_id],
+            )
+        finally:
+            log_call("graph_lookup", time.monotonic() - start)
         return RetrieveResult(
             node_ids=[node.uuid for node in results.nodes],
             edge_ids=[edge.uuid for edge in results.edges],

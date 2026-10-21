@@ -23,6 +23,7 @@ dependencies = [
     "sse-starlette",
     "sqlalchemy",
     "pymysql",
+    "httpx",
 ]
 
 [tool.uv]
@@ -55,7 +56,6 @@ torch = [{ index = "pytorch-cpu" }]
 dev = [
     "pytest",
     "pytest-asyncio",
-    "httpx",
     "ruff",
     "mypy",
 ]
