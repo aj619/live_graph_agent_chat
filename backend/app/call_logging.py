@@ -4,6 +4,7 @@ Not the structured app logger (app/logging_setup.py) and not meant to be. This
 writes exactly one file per chat request, under LOG_DIR, named `<chat_id>.log`,
 with one row per timed call in the order it finished:
 
+    2026-10-18T09:14:02.270Z request_received - 0.01s
     2026-10-18T09:14:03.120Z agent_llm_expand_query - 0.84s
     2026-10-18T09:14:04.510Z graph_lookup - 1.39s
     2026-10-18T09:14:04.510Z embedding - 0.21s

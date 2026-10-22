@@ -4,6 +4,11 @@ Plan §6.1 and §9.3 cover this route.
 
 The route is protected by `require_api_token`. For each request it runs these steps in order:
 
+0. `time.monotonic()` is captured as `received_at`, before any validation —
+   the closest app-level approximation of "when the request reached the web
+   server" (true socket-accept time belongs to uvicorn, not route code). It
+   is passed through to `agent.run`, which logs the gap from this instant to
+   the agent run actually starting as the chat log's first row.
 1. Pydantic validates the body. A missing or non-string `message` gives 422.
 2. The route rejects a `message` that is empty after stripping whitespace, with 422.
    A whitespace-only message is not a real question.
@@ -32,6 +37,7 @@ Shared-service access convention (matches routes_graph.py and routes_documents.p
 The rate limiter is single-process only (see app/ratelimit.py). That matches plan decision D6.
 """
 
+import time
 import uuid
 from typing import Annotated
 
@@ -96,6 +102,8 @@ async def post_chat(
     message is empty after stripping whitespace. 429 when the token is over its
     rate limit. In each error case, no agent run is started.
     """
+    received_at = time.monotonic()
+
     if not body.message.strip():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -109,5 +117,5 @@ async def post_chat(
         )
 
     chat_id = str(uuid.uuid4())
-    background_tasks.add_task(run, chat_id, body.message, graph, bus)
+    background_tasks.add_task(run, chat_id, body.message, graph, bus, received_at)
     return ChatResponse(chat_id=chat_id)

@@ -17,26 +17,31 @@ State (`AgentState`, a TypedDict):
 Node wiring: each node that needs a dependency is built by a factory and
 returned as a closure with the LangGraph node signature
 `async (AgentState) -> AgentState`. The caller passes the dependency in:
-- `make_retrieve_node(graph, llm)` takes a `GraphService` (shared instance,
-  owned by the caller, T2.29) and the agent LLM. It expands the query into
-  AGENT_QUERY_EXPANSIONS variants (rephrasings plus a HyDE-style hypothetical
-  passage, see `expand_query`), runs `graph.retrieve` for the original query and
-  every variant concurrently, and merges the results.
+- `make_retrieve_node(graph, expand_llm)` takes a `GraphService` (shared
+  instance, owned by the caller, T2.29) and the expand-query LLM. It expands
+  the query into AGENT_QUERY_EXPANSIONS variants (rephrasings plus a
+  HyDE-style hypothetical passage, see `expand_query`), runs `graph.retrieve`
+  for the original query and every variant concurrently, and merges the results.
 - `make_grade_node(llm)` takes an agent LLM, typically from `build_agent_llm()`.
 
 Each node returns a full new state dict. It does not mutate the input.
 
-Agent LLM: `build_agent_llm(cfg)` builds a `ChatOpenAI` from the AGENT_LLM_*
-settings. It only stores the base URL and key. No network call happens until
-the model is invoked. Tests pass a fake object with an async `ainvoke` in place
-of the real client.
+Agent LLMs: two separate `ChatOpenAI` factories, each only storing a base URL
+and key (no network call until the model is invoked; tests pass a fake object
+with an async `ainvoke` in place of the real client):
+- `build_agent_llm(cfg)` builds the grade/rewrite/answer model, from the
+  AGENT_LLM_* settings.
+- `build_expand_llm(cfg)` builds the `expand_query` model, from the separate
+  AGENT_LLM_EXPAND_* settings — typically a smaller/faster model, since this
+  call only needs a few short search-query lines, not a full answer.
 
 Tracing: every LLM call passes `get_callback_handlers()` in its config. That
 returns the Langfuse handler only when LANGFUSE_ENABLED is true.
 
 Grade parsing: the model's reply is scanned for the words YES and NO, case
 insensitively. The first one found decides the verdict. A reply with neither
-word counts as NO. A reply with no facts is NO and makes no model call.
+word counts as NO. A reply with no facts is NO and makes no model call, and
+neither does the last allowed rewrite attempt — see `make_grade_node`.
 """
 
 import asyncio
@@ -94,6 +99,28 @@ def build_agent_llm(cfg: Settings = settings) -> ChatOpenAI:
     )
 
 
+def build_expand_llm(cfg: Settings = settings) -> ChatOpenAI:
+    """Return the expand_query chat model, built from the AGENT_LLM_EXPAND_* settings.
+
+    A separate, typically smaller/faster model than `build_agent_llm`'s: this
+    call only produces a handful of short search-query lines (see
+    `_expand_query_prompt`), so it has no need for the main agent model's size
+    or temperature. `max_tokens` is capped, since an uncapped call has no
+    reason to generate more than a short list of lines and every extra token
+    is pure latency for this call.
+
+    Args:
+        cfg: The settings to build from. Defaults to the module-level `settings`.
+    """
+    return ChatOpenAI(
+        base_url=cfg.AGENT_LLM_EXPAND_BASE_URL,
+        api_key=SecretStr(cfg.AGENT_LLM_EXPAND_API_KEY),
+        model=cfg.AGENT_LLM_EXPAND_MODEL,
+        temperature=cfg.AGENT_LLM_TEMPERATURE,
+        max_completion_tokens=150,
+    )
+
+
 def _expand_query_prompt(question: str, limit: int) -> str:
     """Build the prompt asking the agent LLM for alternative search strings."""
     return (
@@ -147,26 +174,33 @@ async def expand_query(llm: ChatOpenAI, question: str, limit: int) -> list[str]:
 
 
 def make_retrieve_node(
-    graph: GraphService, llm: ChatOpenAI
+    graph: GraphService, expand_llm: ChatOpenAI
 ) -> Callable[[AgentState], Awaitable[AgentState]]:
     """Return the retrieve node: expands the query, searches for each variant, merges.
 
-    Runs `expand_query` once (AGENT_QUERY_EXPANSIONS variants, or none when that
-    setting is 0), then runs `graph.retrieve` for the original query and every
-    variant concurrently, and merges the results with `merge_retrieve_results`.
-    Every `retrieve` call does Neo4j-local work plus a local reranking model
-    (see app/graph.py and app/models.py) — no provider API calls — so running
-    several concurrently carries no rate-limit risk; only the one expansion LLM
+    Runs `graph.retrieve` for the original query and `expand_query` (AGENT_QUERY_EXPANSIONS
+    variants, or none when that setting is 0) concurrently with each other — the original
+    query never depends on its own expansion, so there is no reason to wait for the
+    expansion LLM call before starting it. Once expansion resolves, `graph.retrieve` runs
+    for every variant concurrently too, and all results are merged with
+    `merge_retrieve_results`. Every `retrieve` call does Neo4j-local work plus a local
+    reranking model (see app/graph.py and app/models.py) — no provider API calls — so
+    running several concurrently carries no rate-limit risk; only the one expansion LLM
     call above has that cost.
 
     Args:
         graph: The service whose `retrieve` runs the hybrid search.
-        llm: The agent chat model used to generate query variants.
+        expand_llm: The chat model used to generate query variants, typically
+            `build_expand_llm()` — a separate, smaller/faster model than the
+            one used for grading, rewriting, and answering.
     """
 
     async def retrieve(state: AgentState) -> AgentState:
         query = state["query"]
-        variants = await expand_query(llm, query, settings.AGENT_QUERY_EXPANSIONS)
+        original_result, variants = await asyncio.gather(
+            graph.retrieve(query),
+            expand_query(expand_llm, query, settings.AGENT_QUERY_EXPANSIONS),
+        )
         if not variants:
             # No expansion (disabled, or the LLM returned nothing usable): skip
             # merge_retrieve_results entirely, not just as an optimization. It
@@ -174,9 +208,9 @@ def make_retrieve_node(
             # documented invariant), which a single real GraphService.retrieve
             # result always satisfies — merging is only needed, and only safe to
             # assume that invariant for, once there is more than one result.
-            return {**state, "retrieved": await graph.retrieve(query)}
-        results = await asyncio.gather(*(graph.retrieve(q) for q in (query, *variants)))
-        return {**state, "retrieved": merge_retrieve_results(list(results))}
+            return {**state, "retrieved": original_result}
+        variant_results = await asyncio.gather(*(graph.retrieve(q) for q in variants))
+        return {**state, "retrieved": merge_retrieve_results([original_result, *variant_results])}
 
     return retrieve
 
@@ -204,13 +238,20 @@ def parse_verdict(text: str) -> bool:
 def make_grade_node(llm: ChatOpenAI) -> Callable[[AgentState], Awaitable[AgentState]]:
     """Return the grade node, which sets `grounded` from the facts and the agent LLM.
 
-    With no facts, `grounded` is False and the LLM is not called.
+    With no facts, or on the last allowed attempt, `grounded` is False and the LLM is
+    not called: `route_after_grade` sends the last attempt to "answer" regardless of
+    the verdict (plan's rewrite-loop limit), so grading it would be a wasted model
+    call that cannot change the outcome. The answer node still handles an ungrounded
+    last attempt gracefully — its prompt says to admit insufficient facts rather than
+    guess — so skipping the grade here does not change what the user sees.
 
     Args:
         llm: The agent chat model. Only its async `ainvoke` is used.
     """
 
     async def grade(state: AgentState) -> AgentState:
+        if state["rewrites"] >= settings.AGENT_MAX_REWRITES:
+            return {**state, "grounded": False}
         retrieved = state["retrieved"]
         facts = retrieved.facts if retrieved is not None else []
         if not facts:
@@ -379,22 +420,24 @@ def _as_graph_node(
 
 
 def build_agent_graph(
-    graph: GraphService, llm: ChatOpenAI, bus: EventBus
+    graph: GraphService, llm: ChatOpenAI, expand_llm: ChatOpenAI, bus: EventBus
 ) -> CompiledStateGraph[AgentState, None, AgentState, AgentState]:
     """Build and compile the agent graph for one run (plan §6.8).
 
     Wiring: START -> retrieve -> grade. grade goes to answer or rewrite by
     `route_after_grade`. rewrite goes back to retrieve, which is the loop. answer
     goes to END. The graph is built fresh for each run, so its nodes are bound to
-    this run's `graph`, `llm`, and `bus`.
+    this run's `graph`, `llm`, `expand_llm`, and `bus`.
 
     Args:
         graph: The service the retrieve node searches with.
         llm: The agent chat model used by the grade, rewrite, and answer nodes.
+        expand_llm: The chat model the retrieve node uses to generate query
+            variants, typically `build_expand_llm()`.
         bus: The event bus the answer node publishes to.
     """
     builder: StateGraph[AgentState, None, AgentState, AgentState] = StateGraph(AgentState)
-    builder.add_node("retrieve", _as_graph_node(make_retrieve_node(graph, llm)))
+    builder.add_node("retrieve", _as_graph_node(make_retrieve_node(graph, expand_llm)))
     builder.add_node("grade", _as_graph_node(make_grade_node(llm)))
     builder.add_node("rewrite", _as_graph_node(make_rewrite_node(llm)))
     builder.add_node("answer", _as_graph_node(make_answer_node(llm, bus)))
@@ -408,7 +451,13 @@ def build_agent_graph(
     return builder.compile()
 
 
-async def run(chat_id: str, question: str, graph: GraphService, bus: EventBus) -> None:
+async def run(
+    chat_id: str,
+    question: str,
+    graph: GraphService,
+    bus: EventBus,
+    received_at: float | None = None,
+) -> None:
     """Run the agent for one question and publish its outcome on the event bus.
 
     Meant to be started as a background task, so it never raises. On success it
@@ -421,11 +470,20 @@ async def run(chat_id: str, question: str, graph: GraphService, bus: EventBus) -
         question: The user's question. It starts both `question` and `query`.
         graph: The shared graph service the retrieve node searches with.
         bus: The shared event bus for this process.
+        received_at: `time.monotonic()` at the moment `routes_chat.post_chat`
+            started handling the HTTP request, or None (e.g. from a direct
+            `run()` call in a test) to skip logging it. Logged as the chat
+            log's first row, `request_received`, so the log shows the full gap
+            from "request reached the web server" to the first model/graph
+            call, not just time spent inside the agent graph.
     """
     try:
         with start_chat_log(chat_id):
+            if received_at is not None:
+                log_call("request_received", time.monotonic() - received_at)
             llm = build_agent_llm()
-            compiled = build_agent_graph(graph, llm, bus)
+            expand_llm = build_expand_llm()
+            compiled = build_agent_graph(graph, llm, expand_llm, bus)
             initial_state: AgentState = {
                 "chat_id": chat_id,
                 "question": question,

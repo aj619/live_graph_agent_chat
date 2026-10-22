@@ -142,6 +142,13 @@ class Settings(BaseSettings):
     AGENT_LLM_MODEL: str
     AGENT_LLM_TEMPERATURE: float
 
+    # 5.6b Expand-query model (app/agent.py's expand_query) — a separate,
+    # typically smaller/faster model than AGENT_LLM_MODEL, since this call only
+    # needs to produce a few short search-query variants, not a full answer.
+    AGENT_LLM_EXPAND_BASE_URL: str
+    AGENT_LLM_EXPAND_API_KEY: str
+    AGENT_LLM_EXPAND_MODEL: str
+
     # 5.7 Langfuse
     LANGFUSE_ENABLED: bool
     LANGFUSE_HOST: str

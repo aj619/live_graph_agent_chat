@@ -69,6 +69,10 @@ VALUES: dict[str, Any] = {
     "AGENT_LLM_API_KEY": "placeholder-agent-key",
     "AGENT_LLM_MODEL": "placeholder-agent-model",
     "AGENT_LLM_TEMPERATURE": 0.5,
+    # 5.6b Expand-query model
+    "AGENT_LLM_EXPAND_BASE_URL": "http://expand.invalid/v1",
+    "AGENT_LLM_EXPAND_API_KEY": "placeholder-expand-key",
+    "AGENT_LLM_EXPAND_MODEL": "placeholder-expand-model",
     # 5.7 Langfuse
     "LANGFUSE_ENABLED": False,
     "LANGFUSE_HOST": "http://langfuse.invalid",

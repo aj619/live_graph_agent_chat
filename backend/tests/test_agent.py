@@ -77,6 +77,9 @@ ENV_VALUES: dict[str, Any] = {
     "AGENT_LLM_API_KEY": "placeholder-agent-key",
     "AGENT_LLM_MODEL": "placeholder-agent-model",
     "AGENT_LLM_TEMPERATURE": 0.5,
+    "AGENT_LLM_EXPAND_BASE_URL": "http://expand.invalid/v1",
+    "AGENT_LLM_EXPAND_API_KEY": "placeholder-expand-key",
+    "AGENT_LLM_EXPAND_MODEL": "placeholder-expand-model",
     "LANGFUSE_ENABLED": False,
     "LANGFUSE_HOST": "http://langfuse.invalid",
     "LANGFUSE_PUBLIC_KEY": "placeholder-public-key",
@@ -224,7 +227,7 @@ async def test_rewrite_loop_stops_at_agent_max_rewrites(
     fake_graph = FakeGraphService(retrieve_result=agent_module.RetrieveResult(facts=["a fact"]))
     fake_llm = FakeChatModel(invoke_reply="NO", stream_tokens=["answer"])
     bus = EventBus()
-    compiled = agent_module.build_agent_graph(fake_graph, fake_llm, bus)
+    compiled = agent_module.build_agent_graph(fake_graph, fake_llm, fake_llm, bus)
     initial_state = {
         "chat_id": "chat-3",
         "question": "unanswerable?",
@@ -239,12 +242,12 @@ async def test_rewrite_loop_stops_at_agent_max_rewrites(
     # Trace with max_rewrites = 2, every grade answers NO:
     #   retrieve #1 -> grade (ainvoke #1, NO) -> rewrite (ainvoke #2, rewrites=1)
     #   -> retrieve #2 -> grade (ainvoke #3, NO) -> rewrite (ainvoke #4, rewrites=2)
-    #   -> retrieve #3 -> grade (ainvoke #5, NO) -> route sees rewrites>=2 -> answer
+    #   -> retrieve #3 -> grade (rewrites=2 >= max, skipped, no ainvoke) -> answer
     #   -> answer runs astream once -> END.
     assert final["rewrites"] == 2
     assert final["grounded"] is False
     assert len(fake_graph.retrieve_queries) == 3
-    assert len(fake_llm.invoke_calls) == 5
+    assert len(fake_llm.invoke_calls) == 4
     assert len(fake_llm.stream_calls) == 1
 
 
@@ -366,6 +369,31 @@ async def test_grade_with_none_retrieved_is_false_and_makes_no_llm_call(
         "query": "anything?",
         "rewrites": 0,
         "retrieved": None,
+        "grounded": True,
+    }
+
+    result = await grade(state)
+
+    assert result["grounded"] is False
+    assert fake_llm.invoke_calls == []
+
+
+async def test_grade_on_last_allowed_attempt_is_false_and_makes_no_llm_call(
+    agent_module: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """route_after_grade sends the last attempt to "answer" regardless of the verdict
+    (AGENT_MAX_REWRITES), so grading it would be a wasted model call even with facts
+    present — unlike the no-facts case above, this is the only reason it is skipped.
+    """
+    monkeypatch.setattr(agent_module.settings, "AGENT_MAX_REWRITES", 2)
+    fake_llm = FakeChatModel(invoke_reply="YES")
+    grade = agent_module.make_grade_node(fake_llm)
+    state = {
+        "chat_id": "chat-10",
+        "question": "anything?",
+        "query": "anything?",
+        "rewrites": 2,
+        "retrieved": agent_module.RetrieveResult(facts=["a fact"]),
         "grounded": True,
     }
 

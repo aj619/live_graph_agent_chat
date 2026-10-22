@@ -76,6 +76,9 @@ ENV_VALUES: dict[str, Any] = {
     "AGENT_LLM_API_KEY": "placeholder-agent-key",
     "AGENT_LLM_MODEL": "placeholder-agent-model",
     "AGENT_LLM_TEMPERATURE": 0.5,
+    "AGENT_LLM_EXPAND_BASE_URL": "http://expand.invalid/v1",
+    "AGENT_LLM_EXPAND_API_KEY": "placeholder-expand-key",
+    "AGENT_LLM_EXPAND_MODEL": "placeholder-expand-model",
     "LANGFUSE_ENABLED": False,
     "LANGFUSE_HOST": "http://langfuse.invalid",
     "LANGFUSE_PUBLIC_KEY": "placeholder-public-key",
@@ -192,6 +195,7 @@ def fake_llm(env: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> FakeChatM
     """Replace the agent chat model so the chat background task never reaches the network."""
     llm = FakeChatModel(invoke_reply="YES", stream_tokens=["answer"])
     monkeypatch.setattr(env.agent, "build_agent_llm", lambda *args, **kwargs: llm)
+    monkeypatch.setattr(env.agent, "build_expand_llm", lambda *args, **kwargs: llm)
     return llm
 
 
